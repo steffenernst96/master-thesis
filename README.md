@@ -16,6 +16,7 @@ die #s sind ToDos von mir(Steffen)
 - [ ] Einverständniserklärung Experiment von @lukas #s
 - [ ] Demographie-Fragebogen interessantes Festlegen (right handed ness!) #s
 - [ ] Ort für Experiment festlegen, bspw. Bib-Gruppenräume #s
+- [ ] GitHub besser organisieren (?) #s
 
 
 ## Fragen
