@@ -1,0 +1,260 @@
+---
+title: "subject 1"
+author: "Steffen Ernst"
+date: "2023-03-20"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+
+
+Hey ihr 2, hier meil eine quick-and-dirty Analyse des ersten Datensatzes. 
+Ich hoffe das Format ist so in Ordnung.
+
+Zu beachten:
+
+Schwierigkeit 3 ist die höchste, 1 die niedrigste. (wird umgepolt)
+
+correct bezieht sich nur auf die richtige Entscheidung und nicht darauf, ob Punkte erzielt wurden.
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE) 
+
+if (!require("pacman")) install.packages("pacman"); library(pacman)
+p_load(tidyverse, janitor, lme4, apaTables, lmerTest, RColorBrewer, patchwork, knitr, forcats, janitor)
+setwd("C:/Users/steff/Documents/Universität/Master Psychologie/SS 2022/Masterarbeit/Experiment/Daten")
+df <- read_csv("subject-3.csv")
+options(dplyr.summarise.inform = FALSE)
+```
+
+```{r VOrbereitung}
+# Vorverarbeitung
+# Abtrennen von Tutorialbereich
+# To Do: entscheiden, wo ich Daten transformieren will...
+df <- df %>%
+  mutate(
+    difficulty = 3 - difficulty,
+    difficulty_f = as.factor(difficulty),
+    correct = as.factor(correct),
+    correct1 = as.factor(correct1),
+    correct2 = as.factor(correct2),
+    correct3 = as.factor(correct3),
+    )
+
+levels(df$difficulty_f) <-
+  c("sehr leicht", "eher leicht", "eher schwer", "sehr schwer")
+
+df_tut <- df %>%
+  filter(tutorial == 1)
+df <- df %>%
+  filter(tutorial == 0)
+#sachen die ich nachschauen möchte
+#blau vs orange
+```
+
+
+Hier sind checks, ob die einzelnen Schwierigkeiten und Farben richtig balanciert sind. Sieht alles gut aus.
+
+```{r Checks balancing, warning=FALSE}
+table(df$correct_colour)
+#blau vs orange pro Schwierigkeit
+df %>% 
+  group_by(difficulty,block) %>% 
+  summarise(blau = sum(str_count(correct_colour,"b")),orange = sum(str_count(correct_colour,"o")))
+
+#Schwierigkeit pro Bedingung
+df %>% 
+  group_by(block) %>% 
+  summarise(s0 =sum(difficulty==0),s1 = sum(difficulty==1),s3 = sum(difficulty==2),s4 = sum(difficulty==3))
+
+
+
+ggplot(data = df, aes(x=block, y = response_time)) +
+  geom_jitter() +
+  geom_hline(yintercept = 700)
+```
+
+
+```{r}
+#- rts geplottet, die Blocks in Farben, die Schwierigkeit als Form?
+ggplot(data = df, aes(x=1:nrow(df),y=response_time ))+
+  geom_point(aes(colour = block)) # , shape = as.factor(difficulty)))
+```
+
+Je höher die Schwierigkeit, desto länger die RTs:
+```{r}
+ggplot(data = df, aes(x = 1:nrow(df), y = response_time, colour = difficulty_f)) + 
+  geom_point() +
+  scale_color_brewer(palette = "Reds")
+```
+
+
+Hier sieht man sehr schön die unterschiede in den RTs je nach Schwierigkeit und je nach Instruktion:
+```{r}
+
+ggplot(data = df, aes(x=block, y = response_time, colour = difficulty_f)) +
+  geom_boxplot() +
+  scale_color_brewer(palette = "Reds") + 
+  theme_classic() +
+  labs(colour = "Schwierigkeit")
+```
+
+Hier die richtig vs. falschen in Tabellenform:
+```{r}
+
+results_block <- df %>% 
+  #mutate(difficulty_f = fct_relevel(difficulty_f, rev(levels(difficulty_f)))) %>% 
+  count(difficulty_f, block, correct) %>% 
+  group_by(difficulty_f, block) %>% 
+  mutate(Anteil_korrekt = n / (nrow(df)/8)) %>% 
+  arrange(block) %>%   # sort by difficulty
+  filter(correct == 1) %>%      # filter for correct == 1
+  select(-n,-correct) %>% 
+  pivot_wider(names_from = block, values_from = Anteil_korrekt,
+              names_prefix = "korrekt_")
+kable(results_block, format = "markdown", digits = 2, align = "c")
+
+
+```
+
+```{r}
+results_colour <- df %>% 
+  #mutate(difficulty_f = fct_relevel(difficulty_f, rev(levels(difficulty_f)))) %>% 
+  count(difficulty_f, correct_colour, correct) %>% 
+  group_by(difficulty_f, correct_colour) %>% 
+  mutate(Anteil_korrekt = n / (nrow(df)/8)) %>% 
+  arrange(correct_colour) %>%   # sort by difficulty
+  filter(correct == 1) %>%      # filter for correct == 1
+  select(-n,-correct) %>% 
+  pivot_wider(names_from = correct_colour, values_from = Anteil_korrekt,
+              names_prefix = "korrekt_")
+kable(results_colour, format = "markdown", digits = 2, align = "c")
+
+```
+
+
+Interessant ist die Acc. von 50% in der Speed Bedingung und höchster Schwierigkeit!
+Die Probandin war nach Eigenaussage etwas angeschlagen, dazu kommt dass der erste Block nach dem Tutorial(und jeder Pause) Speed war, sie hatte dann auch relativ schnell direkt einen 16er der höchsten Schwierigkeit, und dann nochmal einen 8er:
+```{r}
+df %>% 
+  ggplot(aes(x=1:nrow(df), y = difficulty, col = block)) +
+  geom_point()
+
+```
+
+Hier habe ich zunächst grob die richtigen vs. falschen RTs geplottet insgesamt und auf die Bedingungen aufgeteilt geplottet. 
+Kennt ihr da eine bessere Alternative als Density Plots? 
+```{r rt distributions by wrong or right}
+df %>% 
+  ggplot(aes(x=response_time, colour = correct)) +
+  geom_density() + 
+  theme_minimal() + 
+  ggtitle("RTs über beide Bedingungen")+
+  ylab("") + 
+  xlim(0,3000) +
+  xlab("")
+
+df %>% 
+  filter(block == "speed") %>% 
+  ggplot(aes(x=response_time, colour = correct)) +
+  geom_density() + 
+  theme_minimal() + 
+  ggtitle("RTs in der Geschwindigkeitsbedingung")+
+  ylab("") + 
+  xlim(0,max(df[df$block == "speed",]$response_time)) +
+  xlab("")
+
+df %>% 
+  filter(block == "accuracy") %>% 
+  ggplot(aes(x=response_time, colour = correct)) +
+  geom_density() + 
+  theme_minimal() + 
+  ggtitle("RTs in der Genauigkeitsbedingung")+
+  ylab("") + 
+  xlim(0,3000) +
+  xlab("")
+```
+
+Hier die RTs je nach Schwierigkeit in der Speedbedingung:
+```{r}
+list_speed <- list()
+j = 1
+for (i in levels(df$difficulty_f)) {
+  list_speed[[j]] <- df %>% 
+   filter(block == "speed", difficulty_f == i) %>% 
+  ggplot(aes(x=response_time, colour = correct)) +
+  geom_density(adjust = 1.1) + 
+  theme_minimal() + 
+  ggtitle(i) +
+ # theme(axis.text.y = element_blank()) + 
+  ylab("") + 
+  xlim(0,3000) +
+  xlab("")
+  
+  j = j+1
+} 
+(list_speed[[1]] + list_speed[[2]] +  list_speed[[3]] + list_speed[[4]]) + plot_annotation(
+  title = "RTs in Speedbedingung") #subtitle = "rot = falsch, blau = richtig")
+```
+Das waren erstmal meine Ideen :) 
+Wenn ihr das noch anders aufbereitet sehen wollt, schreibt es mir gerne!
+
+
+Hier die RTs je nach Schwierigkeit in der Genauigkeitsbedingung:
+
+```{r}
+list_acc <- list()
+j = 1
+for (i in levels(df$difficulty_f)) {
+  list_acc[[j]] <- df %>% 
+   filter(block == "accuracy", difficulty_f == i) %>% 
+  ggplot(aes(x=response_time, colour = correct)) +
+  geom_density(adjust = 1.1) + 
+  theme_minimal() + 
+  ggtitle(i) +
+ # theme(axis.text.y = element_blank()) + 
+  ylab("") + 
+  xlim(0,3000) +
+  xlab("")
+  
+  j = j+1
+} 
+(list_acc[[1]] + list_acc[[2]] +  list_acc[[3]] + list_acc[[4]]) + plot_annotation(
+  title = "RTs in Genauigkeitsbedingung") #subtitle = "rot = falsch, blau = richtig")
+
+
+
+```
+Hier noch ein neuer Plot für die Farben-Präferenz
+```{r}
+df %>% 
+  ggplot(aes(x=response_time, colour = correct_colour)) + 
+  geom_density()
+
+
+```
+
+
+Das wär es von mir  :) Habt ihr noch mehr Ideen, was ich plotten könnte?
+
+Hier sind noch weniger nützliche Plots:
+```{r}
+df_arranged <- df %>% 
+  group_by(block) %>% 
+  arrange(., desc(response_time))
+
+df_arranged %>% 
+filter(block == "speed") %>% 
+      ggplot(., aes(x=1:nrow(.), y=response_time, colour = difficulty_f)) +
+  geom_point(alpha = .3) + #,subset(df_arranged,block != "accuracy")) + 
+  scale_color_brewer(palette = "Reds") + 
+  theme_minimal()
+
+df_arranged %>% 
+filter(block == "accuracy") %>% 
+      ggplot(., aes(x=1:nrow(.), y=response_time, colour = correct)) +
+  geom_point(alpha = .3) + #,subset(df_arranged,block != "accuracy")) + 
+  theme_minimal()
+
+```
