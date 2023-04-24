@@ -1,0 +1,17 @@
+"CASE"	"SERIAL"	"REF"	"QUESTNNR"	"MODE"	"STARTED"	"CO01_01"	"CO01_02"	"CO01_03"	"SD01"	"SD02_01"	"SD03"	"SD03_01"	"SD03_01a"	"SD04"	"SD05_01_CN"	"SD05_01_1"	"SD05_01_2"	"SD05_01_3"	"SD05_02_CN"	"SD05_02_1"	"SD05_02_2"	"SD05_02_3"	"SD05_03_CN"	"SD05_03_1"	"SD05_03_2"	"SD05_03_3"	"SD05_04_CN"	"SD05_04_1"	"SD05_04_2"	"SD05_04_3"	"TIME001"	"TIME002"	"TIME003"	"TIME004"	"TIME_SUM"	"MAILSENT"	"LASTDATA"	"FINISHED"	"Q_VIEWER"	"LASTPAGE"	"MAXPAGE"	"MISSING"	"MISSREL"	"TIME_RSI"	"DEG_TIME"
+17			"base"	"interview"	2023-03-16 14:16:54	"LI"	"1999"	"NO"	1	23	1	T	"Germanistik"	5																	80	43	46	6	175		2023-03-16 14:19:49	T	F	4	4	0	0	1.29	22
+18			"base"	"interview"	2023-03-16 14:20:41	"LI"	"1999"	"NO"	1	23	1	T	"Germanistik"	5	1	F	F	T	1	F	F	T	1	F	F	T	1	F	F	T	3	13	50	5	71		2023-03-16 14:21:53	T	F	4	4	0	0	1.7	135
+19			"base"	"interview"	2023-03-21 10:50:08	"An"	"2000"	"He"	2	22	1	T	"Lehramt Primarstufe"	5	1	F	F	T	1	F	F	T	1	F	F	T	1	F	F	T	466	20	33	2	521		2023-03-21 10:58:50	T	F	4	4	0	0	1.53	34
+20			"base"	"interview"	2023-03-21 11:48:31	"Ga"	"1999"	"Ma"	1	23	1	T	"Europäische Kunstgeschichte"	5	1	F	F	T	1	F	T	F	1	F	F	T	1	F	F	T	650	33	85	5	773		2023-03-21 12:01:25	T	F	4	4	0	0	0.69	3
+21			"base"	"interview"	2023-03-21 14:04:53	"Ka"	"2000"	"Mo"	2	22	1	T	"Bildung im Primarbereich"	5	1	F	F	T	1	F	F	T	1	F	F	T	1	F	F	T	41	19	59	12	131		2023-03-21 14:07:04	T	F	4	4	0	0	1.37	48
+22			"base"	"interview"	2023-03-28 10:02:07	"Ta"	"1999"	"Ma"	1	23	1	T	"Physik"	6	1	F	F	T	1	F	F	T	1	F	F	T	1	F	F	T	400	73	111	5	535		2023-03-28 10:11:57	T	F	4	4	0	0	0.62	3
+23			"base"	"interview"	2023-03-28 11:06:33	"Ju"	"1996"	"Be"	2	26	1	T	"Data and Computer Science"	6	1	F	F	T	1	F	F	T	1	F	F	T	1	F	F	T	189	19	68	17	282		2023-03-28 11:11:27	T	F	4	4	0	0	0.81	1
+24			"base"	"interview"	2023-03-28 13:07:55	"Ba"	"1999"	"Wi"	2	23	1	T	"Medizin"	5	1	F	F	T	1	F	F	T	1	F	F	T	1	F	F	T	10	27	73	11	121		2023-03-28 13:09:56	T	F	4	4	0	0	1.26	125
+25			"base"	"interview"	2023-03-28 14:18:21	"Ut"	"2000"	"We"	1	23	1	T	"Germanistik und Romanistik mit Lehramtsoption"	5	1	F	F	T	1	F	F	T	1	F	F	T	1	F	F	T	11	19	42	5	77		2023-03-28 14:19:38	T	F	4	4	0	0	1.64	132
+26			"base"	"interview"	2023-03-28 15:47:56	"Bi"	"1999"	"Ma"	1	23	1	T	"Humanmedizin"	5	1	F	F	T	1	F	F	T	1	F	F	T	1	F	F	T	4	14	41	8	67		2023-03-28 15:49:03	T	F	4	4	0	0	1.62	134
+27			"base"	"interview"	2023-04-11 13:52:19	"ed"	"1999"	"br"	2	23	1	T	"Humanmedizin"	5	1	F	F	T	1	F	F	T	1	F	F	T	1	F	F	T	210	12	38	4	264		2023-04-11 13:56:43	T	F	4	4	0	0	1.38	20
+28			"base"	"interview"	2023-04-12 09:52:11	"es"	"2000"	"he"	1	22	1	T	"geographie"	5	1	F	F	T	1	F	F	T	1	F	F	T	1	F	F	T	920	17	55	8	1000		2023-04-12 10:08:51	T	F	4	4	0	0	0.78	2
+29			"base"	"interview"	2023-04-12 14:00:23	"KA"	"1996"	"HE"	1	26	1	T	"Geographie"	6	1	F	F	T	1	F	F	T	1	F	F	T	1	F	F	T	49	17	60		126		2023-04-12 14:02:29	F	F	3	3	0	0	1.69	53
+30			"base"	"interview"	2023-04-19 11:49:00	"an"	"1999"	"ma"	1	23	1	T	"Physik"	5	1	F	F	T	1	F	F	T	1	F	F	T	1	F	F	T	883	27	65	15	990		2023-04-19 12:05:30	T	F	4	4	0	0	0.55	0
+31			"base"	"interview"	2023-04-19 12:52:05	"MO"	"1999"	"TU"	2	23	1	T	"Computer Science"	6	1	T	F	F	1	T	F	F	1	T	F	F	1	T	F	F	792	13	68	2	875		2023-04-19 13:06:40	T	F	4	4	0	0	1.39	31
+32			"base"	"interview"	2023-04-20 09:44:46	"si"	"2001"	"fr"	1	22	1	T	"Psychologie"	5	1	F	F	T	1	F	F	T	1	F	F	T	1	F	F	T	524	21	43	8	596		2023-04-20 09:54:42	T	F	4	4	0	0	0.84	4

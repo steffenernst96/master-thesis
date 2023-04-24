@@ -1,17 +1,8 @@
 # master-thesis
+In data_raw finden sich die csv Dateien die 1:1 aus dem Experiment stammen. Zusätzlich findet sich der Sosci-Survey-Datensatz für die Demographischen Variablen + die Händigkeit darin.
+In data_cleaned wurden die Originaldaten gesäubert, gekürzt und mit den Demographievariablen verbunden. Dabei wurde die Schwierigkeit umcodiert! 
+Weitere Infos zu den Variablen findet sich im Codebook.
 
-die #s sind ToDos von mir(Steffen)
 
 ## TO-DO List Experiment
 
-- [ ] finale Version: mehrere erstellen für die randomisierung der ersten Bedingung, ersten Farbe und Tastenbelegung #s
-
-## TO-DO List non-Experiment
-- [ ] Einverständniserklärung Experiment von @lukas #s
-- [ ] Demographie-Fragebogen Interessantes Festlegen (right handed ness!) #s
-- [ ] Ort für Experiment festlegen, bspw. Bib-Gruppenräume #s
-- [ ] GitHub besser organisieren (?) #s
-
-
-## Fragen
-- [ ] Uhrzeit der Experiment-Durchführung ist egal? #s
