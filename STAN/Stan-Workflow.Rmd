@@ -1,0 +1,150 @@
+---
+title: "Workflow Stan"
+author: "Steffen Ernst"
+date: "2023-05-01"
+output: html_document
+---
+
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+if (!require("pacman")) install.packages("pacman"); library(pacman)
+p_load(tidyverse, janitor, knitr, forcats, bayesplot, RcppParallel,rstan)
+#setwd("C:/Users/steff/Documents/Universität/Master Psychologie/SS 2022/Masterarbeit")
+knitr::opts_knit$set(root.dir = "C:/Users/steff/Documents/Universität/Master Psychologie/SS 2022/Masterarbeit")
+
+options(mc.cores = parallel::detectCores())
+
+```
+
+```{r}
+df <- read_csv("Experiment/Daten/Daten_cleaned/subject_1.csv")
+rt <- df$response_time
+correct <- df$correct
+difficulty <- df$difficulty
+condition <- ifelse(df$block=="accuracy", 1,0)
+condition2 <- ifelse(df$block=="accuracy", 4,0)
+N <- nrow(df)
+
+  # Create data list
+data_list <- list(N = N,
+                    rt = rt,
+                    correct = correct,
+                    difficulty = difficulty,
+                    condition = condition,
+                    condition2 = condition2)
+```
+
+
+```{r model1, eval=FALSE}
+model_file <- "C:/Users/steff/Documents/Universität/Master Psychologie/SS 2022/Masterarbeit/Skripte/model1.stan"
+set.seed(12345)
+fit1 <- stan(
+    file = model_file,
+    data = data_list,    # name d list of data
+    chains = 4,             # number of Markov chains
+    warmup = 1000,          # number of warmup iterations per chain
+    iter = 4000,#,            # total number of iterations per chain
+    cores = parallel::detectCores(),              # number of cores (could use one per chain)
+    # refresh = 0             # no progress shown
+  )
+
+saveRDS(fit1, "STAN/fit1.rds")
+```
+
+```{r model2, eval=FALSE}
+model_file <- "C:/Users/steff/Documents/Universität/Master Psychologie/SS 2022/Masterarbeit/Skripte/model2.stan"
+
+set.seed(12345)
+fit2 <- stan(
+    file = model_file,
+    data = data_list,    # name d list of data
+    chains = 4,             # number of Markov chains
+    warmup = 1000,          # number of warmup iterations per chain
+    iter = 4000,#,            # total number of iterations per chain
+    cores = parallel::detectCores()   # number of cores (could use one per chain)
+    # refresh = 0             # no progress shown
+  )
+
+saveRDS(fit2, "STAN/fit2.rds")
+```
+
+```{r, include = FALSE}
+fit1 <- readRDS("~/Universität/Master Psychologie/SS 2022/Masterarbeit/STAN/fit1.rds")
+fit2 <- readRDS("~/Universität/Master Psychologie/SS 2022/Masterarbeit/STAN/fit2.rds")
+```
+
+```{r model1 checks}
+# Check convergence
+print(fit1, par=c("a", "v", "ndt"), digits=2)
+print(rstan::stan_rhat(fit1))
+#mcmc_trace(fit1)#, pars = "ndt")
+stan_trace(fit1)
+mcmc_pairs(fit1, pars = c("v[1]", "v[2]", "v[3]", "v[4]", "a[1]"))
+mcmc_pairs(fit1, pars = c("a[1]", "a[2]", "ndt"))
+mcmc_pairs(fit1, pars = c("v[1]", "v[2]", "v[3]", "v[4]", "a[1]", "a[2]", "ndt"))
+
+```
+```{r model2 checks}
+# Check convergence
+print(fit2, par=c("a", "v", "ndt"), digits=2)
+print(rstan::stan_rhat(fit2))
+#mcmc_trace(fit1)#, pars = "ndt")
+stan_trace(fit2, pars = c("v[1]", "v[2]", "v[3]", "v[4]", "v[5]", "v[6]", "v[7]", "v[8]"))
+mcmc_pairs(fit2, pars = c("v[1]", "v[2]", "v[3]", "v[4]"))
+mcmc_pairs(fit2, pars = c("v[5]", "v[6]", "v[7]", "v[8]"))           
+mcmc_pairs(fit2, pars = c("v[1]", "v[2]", "v[3]", "v[4]", "a[1]", "a[2]", "ndt"))
+mcmc_pairs(fit2, pars = c("v[5]", "v[6]", "v[7]", "v[8]", "a[1]", "a[2]", "ndt"))
+mcmc_pairs(fit2, pars = c("v[1]", "v[2]", "v[3]", "v[4]", "v[5]", "v[6]", "v[7]", "v[8]"))
+mcmc_pairs(fit2, pars = c("a[1]", "a[2]", "ndt"))
+
+```
+
+```{r possible Workflow all participants, eval=FALSE}
+#creates list all_models which consists of 14 lists. In each of the 14 lists there are 2 models
+all_models <- list()
+set.seed(12345)
+df_all <-  read_csv("Experiment/Daten/Daten_cleaned/df_all.csv")
+for (i in unique(df_all$code)) {
+  df_temp <- df_all %>% filter(code==i)
+  rt <- df_temp$response_time
+  correct <- df_temp$correct
+  difficulty <- df_temp$difficulty
+  condition <- ifelse(df_temp$block=="accuracy", 1,0)
+  condition2 <- ifelse(df_temp$block=="accuracy", 4,0)
+  N <- nrow(df_temp)
+  
+  data_list <- list(N = N,
+                    rt = rt,
+                    correct = correct,
+                    difficulty = difficulty,
+                    condition = condition,
+                    condition2 = condition2)
+  model_file <- "C:/Users/steff/Documents/Universität/Master Psychologie/SS 2022/Masterarbeit/Skripte/model1.stan"
+  fit1 <- stan(
+    file = model_file,
+    data = data_list,    # name d list of data
+    chains = 4,             # number of Markov chains
+    warmup = 1000,          # number of warmup iterations per chain
+    iter = 4000,#,            # total number of iterations per chain
+    cores = parallel::detectCores()              # number of cores (could use one per chain)
+    # refresh = 0             # no progress shown
+  )
+  
+  model_file <- "C:/Users/steff/Documents/Universität/Master Psychologie/SS 2022/Masterarbeit/Skripte/model2.stan"# to do
+  fit2 <- stan(
+    file = model_file,
+    data = data_list,    # name d list of data
+    chains = 4,             # number of Markov chains
+    warmup = 1000,          # number of warmup iterations per chain
+    iter = 4000,            # total number of iterations per chain
+    cores = parallel::detectCores()              # number of cores (could use one per chain)
+    # refresh = 0             # no progress shown
+  )
+  listname = paste0("fitlist_", df_temp[1,"subject_nr"])
+  list_temp <- list(fit1 = fit1, fit2 = fit2)
+  all_models[[listname]] <- list_temp
+}
+```
+
