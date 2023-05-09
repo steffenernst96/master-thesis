@@ -10,26 +10,44 @@ data {
 
 parameters {
   real<lower=0> v[4]; // array mit 4 drift rates
-  real<lower=0> a[2]; // array mit 2 drift rates
-  real<lower=0> ndt;
+  real<lower=0.5> a[2]; // array mit 2 drift rates
+  real<lower=0.1> ndt;
 }
 
 
 model {
   // Priors
-  v ~ gamma(2.5, 2.0); //gleicher Prior für alle 4 drift rates
-  a ~ gamma(4.0, 3.0); //gleicher Prior für 2 boundaries
-  ndt ~ gamma(1.5, 5.0);
+  v ~ normal(0, 2);
+  a ~ normal(0.5, 1.5);
+  ndt ~ normal(0.1, 0.2);
   
   for (n in 1:N) {
     
     if (correct[n] == 1) {
-      rt[n] ~ wiener(a[condition[n] + 1], ndt, 0.5, v[difficulty[n]+1]); // difficulty bestimmt, welches v 
+      rt[n] ~ wiener(a[condition[n] + 1], ndt, 0.5, v[difficulty[n] + 1]); // difficulty bestimmt, welches v 
+
     } 
     else {
-      rt[n] ~ wiener(a[condition[n] + 1], ndt, 0.5, -v[difficulty[n]+1]); // negativ, weil v immer "positiv" ist
+      rt[n] ~ wiener(a[condition[n] + 1], ndt, 0.5, -v[difficulty[n] + 1]); // negativ, weil v immer "positiv" ist
     }      
   }
 }
 
 
+generated quantities {
+  vector[N] log_lik;
+  for (n in 1:N) {
+    if (correct[n] == 1) {
+      log_lik[n] = wiener_lpdf(rt[n] | a[condition[n] + 1],
+                               ndt,
+                               0.5,
+                               v[difficulty[n] + 1]);
+    }
+    else {
+      log_lik[n] = wiener_lpdf(rt[n] | a[condition[n] + 1],
+                               ndt,
+                               0.5,
+                               -v[difficulty[n] + 1]);
+    }
+  }
+}

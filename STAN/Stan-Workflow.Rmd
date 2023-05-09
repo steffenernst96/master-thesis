@@ -18,13 +18,49 @@ options(mc.cores = parallel::detectCores())
 
 ```
 
+
+```{r wiener process, include=FALSE}
+wiener_process <- function (v=1, a=1, z=0.5, ndt=0.3) {
+  # Standard DDM Model Parameters
+  # v   = drift rate
+  # a   = boundary separation
+  # z   = starting point; = 0.5 corresponds to no bias
+  # ndt = non-decision time in s
+  
+  max_iter <- 1e4 # maximum process duration in ms
+  dt <- 0.001    # time steps
+  sd <- 1        # sd for noise
+  sqrt_dt <- sqrt(dt*sd)
+  
+  # initialize diffusion path for current trial
+  path <-  a * z
+  # sample diffusion process noise
+  noise <- rnorm(max_iter, 0, 1)
+  
+  # evidence accumulation process
+  iter <- 1
+  while (path > 0 & path < a & iter < max_iter) {
+    path <- path + v*dt + sqrt_dt*noise[iter]
+    iter <- iter + 1
+  }
+  
+  # return response time [s] and choice [0, 1]
+  return(c(ndt + iter*dt, as.numeric(path > a)))
+}
+
+```
+
 ```{r}
-df <- read_csv("Experiment/Daten/Daten_cleaned/subject_1.csv")
-rt <- df$response_time
+df <- read_csv("Experiment/Daten/Daten_cleaned/special/color_discrimination_data.csv")
+df <- df %>% 
+  filter(tutorial == 0,
+         id == 1)
+  
+rt <- df$rt
 correct <- df$correct
 difficulty <- df$difficulty
-condition <- ifelse(df$block=="accuracy", 1,0)
-condition2 <- ifelse(df$block=="accuracy", 4,0)
+condition <- df$speed_condition
+condition2 <- ifelse(df$speed_condition==1, 4,0)
 N <- nrow(df)
 
   # Create data list
@@ -44,7 +80,7 @@ fit1 <- stan(
     file = model_file,
     data = data_list,    # name d list of data
     chains = 4,             # number of Markov chains
-    warmup = 1000,          # number of warmup iterations per chain
+    warmup = 2000,          # number of warmup iterations per chain
     iter = 4000,#,            # total number of iterations per chain
     cores = parallel::detectCores(),              # number of cores (could use one per chain)
     # refresh = 0             # no progress shown
@@ -61,7 +97,7 @@ fit2 <- stan(
     file = model_file,
     data = data_list,    # name d list of data
     chains = 4,             # number of Markov chains
-    warmup = 1000,          # number of warmup iterations per chain
+    warmup = 2000,          # number of warmup iterations per chain
     iter = 4000,#,            # total number of iterations per chain
     cores = parallel::detectCores()   # number of cores (could use one per chain)
     # refresh = 0             # no progress shown
@@ -84,8 +120,9 @@ stan_trace(fit1)
 mcmc_pairs(fit1, pars = c("v[1]", "v[2]", "v[3]", "v[4]", "a[1]"))
 mcmc_pairs(fit1, pars = c("a[1]", "a[2]", "ndt"))
 mcmc_pairs(fit1, pars = c("v[1]", "v[2]", "v[3]", "v[4]", "a[1]", "a[2]", "ndt"))
-
+  
 ```
+
 ```{r model2 checks}
 # Check convergence
 print(fit2, par=c("a", "v", "ndt"), digits=2)
@@ -101,13 +138,77 @@ mcmc_pairs(fit2, pars = c("a[1]", "a[2]", "ndt"))
 
 ```
 
+
+Hier sind die Posterio retrodiction Tests:
+```{r}
+
+posterior_samples <- rstan::extract(fit1, pars = c("v[1]", "v[2]", "v[3]", "v[4]", "a[1]", "a[2]", "ndt"))
+j=1
+sim_data <- tibble(response_time_fake = double(), correct_fake = integer())
+for (i in 1:nrow(df)) {
+  v <- posterior_samples[[1 + difficulty[i]]] [j]
+  a <- posterior_samples[[5 + condition[i]]] [j]
+  ndt <- posterior_samples[[7]] [j]
+  output <- wiener_process(v=v, a=a,ndt=ndt)
+  sim_data <- sim_data %>% add_row(response_time_fake = output[1], correct_fake = output[2])
+  j <-  ifelse(j>199,1,j+1)
+  
+}
+df_vis <- tibble(sim_data, response_time_real = rt, correct, condition, difficulty)
+
+ggplot(df_vis, aes(x = response_time_fake)) + #, fill = factor(correct))) +
+  geom_density()+ #aes(fill = "red")) +
+  geom_density(aes(x=response_time_real)) +#aplha = 0.5, fill = "blue")) + 
+  facet_grid(difficulty ~ condition,labeller = labeller(difficulty = as.character, 
+                               condition = function(x) ifelse(x==1, "Speed", "Accuracy"))) +
+  xlim(0,2) +
+  labs(title = "RT in Abhängigkeit von Bedingung und Schwierigkeit",
+       x = "RT",
+       y = "Density",
+       fill = "Correct")
+
+
+
+df_resp_prob <- df_vis %>%
+  group_by(condition, difficulty) %>%
+  summarise(resp_prob_real = mean(correct),
+            resp_prob_fake = mean(correct_fake)) %>%
+  pivot_longer(cols = c(resp_prob_real, resp_prob_fake),
+               names_to = "response_type",
+               values_to = "response_prob") %>%
+  mutate(response_type = factor(response_type,
+                                 levels = c("resp_prob_real", "resp_prob_fake"),
+                                 labels = c("Real", "Fake")))
+df_resp_prob %>%  
+  filter(condition == 0) %>% #speed
+  ggplot(aes(x = factor(difficulty), y = response_prob, fill = response_type)) +
+  geom_bar(stat = "identity", position = position_dodge(width = 0.9), color = "black") +
+  scale_fill_manual(values = c("Real" = "steelblue", "Fake" = "firebrick")) +
+  labs(x = "Difficulty", y = "Antwortwahrscheinlichkeit", fill = "Datenart") +
+  theme_classic() + 
+  ggtitle("Speed-Bedingung")
+
+df_resp_prob %>%  
+  filter(condition == 1) %>% #accuracy
+  ggplot(aes(x = factor(difficulty), y = response_prob, fill = response_type)) +
+  geom_bar(stat = "identity", position = position_dodge(width = 0.9), color = "black") +
+  scale_fill_manual(values = c("Real" = "steelblue", "Fake" = "firebrick")) +
+  labs(x = "Difficulty", y = "Antwortwahrscheinlichkeit", fill = "Datenart") +
+  theme_classic() + 
+  ggtitle("Speed-Bedingung")
+
+kable(df_resp_prob, format = "markdown", digits = 2, align = "c")
+```
+
 ```{r possible Workflow all participants, eval=FALSE}
 #creates list all_models which consists of 14 lists. In each of the 14 lists there are 2 models
 all_models <- list()
 set.seed(12345)
-df_all <-  read_csv("Experiment/Daten/Daten_cleaned/df_all.csv")
-for (i in unique(df_all$code)) {
-  df_temp <- df_all %>% filter(code==i)
+df_min <-  read_csv("Experiment/Daten/Daten_cleaned/df_min.csv")
+for (i in unique(df_min$code)) {
+  df_temp <- df_min %>% filter(code==i,
+                            tutorial==0
+                            ) 
   rt <- df_temp$response_time
   correct <- df_temp$correct
   difficulty <- df_temp$difficulty
@@ -126,22 +227,24 @@ for (i in unique(df_all$code)) {
     file = model_file,
     data = data_list,    # name d list of data
     chains = 4,             # number of Markov chains
-    warmup = 1000,          # number of warmup iterations per chain
+    warmup = 2000,          # number of warmup iterations per chain
     iter = 4000,#,            # total number of iterations per chain
     cores = parallel::detectCores()              # number of cores (could use one per chain)
     # refresh = 0             # no progress shown
   )
+  saveRDS(fit1, file = paste0("subject_",df_temp[1,"subject_nr"] ,"_fit1"))
   
   model_file <- "C:/Users/steff/Documents/Universität/Master Psychologie/SS 2022/Masterarbeit/Skripte/model2.stan"# to do
   fit2 <- stan(
     file = model_file,
     data = data_list,    # name d list of data
     chains = 4,             # number of Markov chains
-    warmup = 1000,          # number of warmup iterations per chain
+    warmup = 2000,          # number of warmup iterations per chain
     iter = 4000,            # total number of iterations per chain
     cores = parallel::detectCores()              # number of cores (could use one per chain)
     # refresh = 0             # no progress shown
   )
+  saveRDS(fit2, file = paste0("subject_",df_temp[1,"subject_nr"] ,"_fit2"))
   listname = paste0("fitlist_", df_temp[1,"subject_nr"])
   list_temp <- list(fit1 = fit1, fit2 = fit2)
   all_models[[listname]] <- list_temp
