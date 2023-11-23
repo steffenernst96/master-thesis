@@ -1,8 +1,8 @@
 # master-thesis
-In data_raw finden sich die csv Dateien die 1:1 aus dem Experiment stammen. Zusätzlich findet sich der Sosci-Survey-Datensatz für die Demographischen Variablen + die Händigkeit darin.
-In data_cleaned wurden die Originaldaten gesäubert, gekürzt und mit den Demographievariablen verbunden. Dabei wurde die Schwierigkeit umcodiert! 
-Weitere Infos zu den Variablen findet sich im Codebook.
+In this repository you will find the experiment, all scripts and all the raw data from my master thesis which is supervised by [@LuSchumacher](https://github.com/LuSchumacher) and[@mschnuerch](https://github.com/mschnuerch)
+If you want to run this code on your machine, keep in mind that your c++ toolchain needs to be configured so that RStan can be used. More info can be found [here](https://github.com/stan-dev/rstan/wiki/RStan-Getting-Started).
 
+For the experiment to run you will need Opensesame which can be found [here](https://osdoc.cogsci.nl/3.3/).
 
-## TO-DO List Experiment
+At the moment the code needs some adaptions to be able to reproduce all analysis and graphs after being downloaded, mainly concerning file locations.
 
