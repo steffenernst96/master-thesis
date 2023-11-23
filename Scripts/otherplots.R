@@ -68,7 +68,9 @@ ggplot(data = toplot) +
 ggsave(filename = "DDM.png", width = 10000, height = 7000, units = "px", dpi = 1600)
 
 
-  ##time series plot
+
+
+##time series plot
 df <- read_csv("C:/Users/steff/Documents/Universität/Master Psychologie/SS 2022/Masterarbeit/Experiment/Daten/Daten_cleaned/special/df_all.csv")
 
 
@@ -114,10 +116,10 @@ ggsave("timeseries.png", timeseries,  width = 5000, height = 3500, units = "px",
 set.seed(42)
 
 # Generate the exponential growth values with increased length and less steepness
-column1 <- exp(seq(1, 3, length.out = 100))
+column1 <- exp(seq(1, 3.8, length.out = 150))
 
 # Generate the second column with more extreme random fluctuations
-column2 <- column1 + runif(100, -5, 5)
+column2 <- column1 + rnorm(100, 0, 2.4)
 
 # Calculate the mean of the second column 200 times
 column3 <- rep(mean(column2), length(column2))
@@ -125,31 +127,35 @@ column3 <- rep(mean(column2), length(column2))
 # Create the dataframe
 df <- data.frame(Column1 = column1, Column2 = column2, Column3 = column3)
 
+mean(column2)
+sd(column2)
 # Calculate the manual confidence interval for Column 1
 ci_lower <- column1 - 5
 ci_upper <- column1 + 5
 
-ci_lower3 <- column3 - 13
-ci_upper3 <- column3 + 13
+
 # Plot the values as lines with confidence intervals
 hypothetical_parameter <-  ggplot(df) +
   geom_line(aes(x = seq_along(Column1), y = Column1, color = "Column 1")) +
-  geom_ribbon(aes(x = seq_along(Column3), ymin = ci_lower3, ymax = ci_upper3),
-              fill = "steelblue", alpha = 0.3) +
+  geom_ribbon(aes(x = 1:nrow(df), ymin = rep(mean(column2)-sd(column2), nrow(df)), ymax = rep(mean(column2)+sd(column2), nrow(df))),
+              fill = "#768da8", alpha = 0.3) +
   geom_ribbon(aes(x = seq_along(Column1), ymin = ci_lower, ymax = ci_upper),
-              fill = "firebrick4", alpha = 0.9) +
+              fill = "firebrick4", alpha = 0.8) +
   
   geom_line(aes(x = seq_along(Column3), y = Column3, color = "Column 3 (Mean)")) +
-  labs(x = substitute(paste("Time ", italic("T"))), y = substitute(paste("Parameter ", italic("\u03B8")))) +
-  scale_color_manual(values = c("firebrick4", "black", "steelblue2")) +
+  labs(x = substitute(paste("Zeit ", italic("T"))), y = substitute(paste("Parameter ", italic("\u03B8")))) +
+  scale_color_manual(values = c("firebrick4", "black", "#768da8")) +
   geom_line(aes(x = seq_along(Column2), y = Column2, color = "Column 2")) +
-  theme_minimal() +
+  theme_apa() +
   theme(legend.position = "none",
         axis.ticks.x = element_blank(),
         axis.text.x = element_blank(),
         axis.ticks.y = element_blank(),
         axis.text.y = element_blank())
+hypothetical_parameter
 ggsave("Hypothetical Parameter.png",  hypothetical_parameter, width = 5000, height = 3500, units = "px", dpi = 800)
 
 
-## 
+## table 
+#we want to know which value for erstebedingung and blauetaste there is
+

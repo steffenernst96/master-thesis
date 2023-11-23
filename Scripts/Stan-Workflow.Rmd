@@ -10,7 +10,7 @@ output: html_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 if (!require("pacman")) install.packages("pacman"); library(pacman)
-p_load(tidyverse, janitor, knitr, forcats, bayesplot, RcppParallel,rstan, BayesFactor, bridgesampling, loo, reticulate, papaja, patchwork)
+p_load(tidyverse, janitor, forcats, bayesplot, RcppParallel, rstan, BayesFactor, bridgesampling, loo, reticulate, papaja, patchwork)
 #setwd("C:/Users/steff/Documents/Universität/Master Psychologie/SS 2022/Masterarbeit")
 
 knitr::opts_knit$set(root.dir = "C:/Users/steff/Documents/Universität/Master Psychologie/SS 2022/Masterarbeit")
@@ -75,8 +75,10 @@ for (i in 1:14) { #unique(df$id)
   df_temp <- df %>% filter(id==i,
                            tutorial==0)
   border <- boxplot.stats(log(df_temp$rt))$stats[1]
+  print(table(log(df_temp$rt) > border))
   df_temp <- df_temp %>% filter(log(df_temp$rt) > border)
   
+
   rt <- df_temp$rt
   min_rt <- min(rt)
   correct <- df_temp$correct
@@ -107,7 +109,7 @@ for (i in 1:14) { #unique(df$id)
   model_file <- "C:/Users/steff/Documents/Universität/Master Psychologie/SS 2022/Masterarbeit/Skripte/model2.stan"# to do
   fit2 <- stan(
     file = model_file,
-    data = data_list,    # name d list of data
+    data = data_list,    # named list of data
     chains = 4,             # number of Markov chains
     warmup = 2000,          # number of warmup iterations per chain
     iter = 4000,            # total number of iterations per chain
@@ -124,7 +126,7 @@ for (i in 1:14) { #unique(df$id)
 ```
 
 Alle Modelle laden.
-```{r load all STAN Models, create loos}
+```{r load all STAN Models}
 filenames <- list.files("C:/Users/steff/Documents/Universität/Master Psychologie/SS 2022/Masterarbeit/STAN", pattern="*.rds", full.names=TRUE)
 ldf <- lapply(filenames, read_rds)
 
@@ -134,7 +136,26 @@ for (i in 1:length(ldf)) {
   ldf[[i]]@model_name <- filenames_shortened[i]
 }
 #create a list with loo for all models
+```
+
+
+```{r  create loos}
 loo_list <-  list()
+ldf_id <- c(15, 1, 
+            24, 10, 
+            25, 11, 
+            26, 12, 
+            27, 13, 
+            28, 14, 
+            16, 2, 
+            17, 3, 
+            18, 4, 
+            19, 5, 
+            20, 6, 
+            21, 7, 
+            22, 8, 
+            23, 9)
+position <- match(15:28, ldf_id) # Use the match function to find positions
 for (i in 1:length(ldf)) {
   loo_list[[i]] <- loo(ldf[[i]])
 }
@@ -148,8 +169,64 @@ for (i in 1:(length(ldf)/2)) {
 
 }
 results = c(2, 2, 1, 2, 2, 1, 2, 1, 1, 2, 2, 2, 1, 2)
+
+#or load the results:
+for (i in loocomparison_list) {
+  
+}
+
+as.data.frame(loocomparison_list)
+loocomparison_list_named <-  loocomparison_list %>% set_names(c(1:14))
+bind_rows(loocomparison_list_named)
+
+reorder_rows <- function(df) {
+  # Check if 'model1' is in the row names
+  if ("model1" %in% rownames(df)) {
+    # Move 'model1' to the first row
+    df <- df[c("model1", setdiff(rownames(df), "model1")), ]
+  }
+  return(df)
+}
+
+# Apply the reorder_rows function to each data frame in the list
+reordered_loocomparison_list <- lapply(loocomparison_list, reorder_rows)
+combined_df <- as_tibble(do.call(rbind, reordered_loocomparison_list))
+combined_df <- combined_df %>% 
+  select("elpd_loo", "se_elpd_loo", "elpd_diff", "se_diff") %>% 
+  add_column(Modell =rep(c("M1","M2"), 14), .before = "elpd_loo") %>%
+  add_row(Modell = "Versuchsperson 1",.before = 1) %>% 
+  add_row(Modell = "Versuchsperson 2",.before = 4) %>% 
+  add_row(Modell = "Versuchsperson 3",.before = 7) %>% 
+  add_row(Modell = "Versuchsperson 4",.before = 10) %>% 
+  add_row(Modell = "Versuchsperson 5",.before = 13) %>% 
+  add_row(Modell = "Versuchsperson 6",.before = 16) %>% 
+  add_row(Modell = "Versuchsperson 7",.before = 19) %>% 
+  add_row(Modell = "Versuchsperson 8",.before = 22) %>% 
+  add_row(Modell = "Versuchsperson 9",.before = 25) %>% 
+  add_row(Modell = "Versuchsperson 10",.before = 28) %>% 
+  add_row(Modell = "Versuchsperson 11",.before = 31) %>% 
+  add_row(Modell = "Versuchsperson 12",.before = 34) %>% 
+  add_row(Modell = "Versuchsperson 13",.before = 37) %>% 
+  add_row(Modell = "Versuchsperson 14",.before = 40)
+
+kable_table <- kable(combined_df, format = "html", digits=2)
+kable_table
 ```
-```{r create a single model, eval = FALSE}
+
+
+```{python npy load dataset in python}
+import numpy as np
+posterior_samples_mrw = np.load("C:/Users/steff/Documents/Universität/Master Psychologie/SS 2022/Masterarbeit/STAN/local_post_samples_mrw.npy") # posteriors as ndarray
+```
+
+```{r load data and transfer from python to R}
+posterior_samples_mrw <- py$posterior_samples_mrw #import into R environment
+#df <- read_csv("C:/Users/steff/Documents/Universität/Master Psychologie/SS 2022/Masterarbeit/Experiment/Daten/Daten_cleaned/special/df_min.csv")
+df <- read_csv("C:/Users/steff/Documents/Universität/Master Psychologie/SS 2022/Masterarbeit/Experiment/Daten/Daten_cleaned/special/color_discrimination_data.csv")
+```
+
+
+```{r if you want to create a single model, eval = FALSE}
 df <- read_csv("Experiment/Daten/Daten_cleaned/special/color_discrimination_data.csv")
 df <- df %>% 
   filter(tutorial == 0)
@@ -210,7 +287,7 @@ saveRDS(fit2, "STAN/fit2.rds")
 
 ```{r load single model, include = FALSE, eval= FALSE}
 fit1 <- readRDS("~/Universität/Master Psychologie/SS 2022/Masterarbeit/STAN/subject_1_fit1.rds")
-fit2 <- readRDS("~/Universität/Master Psychologie/SS 2022/Masterarbeit/STAN/fit2.rds")
+fit2 <- readRDS("~/Universität/Master Psychologie/SS 2022/Masterarbeit/STAN/subject_2_fit2.rds")
 ```
 
 ```{r model1 checks, eval= FALSE}
