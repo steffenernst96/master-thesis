@@ -75,34 +75,34 @@ wiener_process <- function (v=1, a=1, z=0.5, ndt=0.3) {
 This generates parameter development plots for all 3 parameters, v,a,ndt.
 Condition has stored sd and mean values for all parameters. Details on structure in chunk 9.
 ```{r function generate parameter plot}
-generate_parameter_plot <- function(data, condition) { 
-# Creates a combined plot, 1 plot for ever parameter_type.
+generate_parameter_plot <- function(data, condition, difficulty) { 
+  # Creates a combined plot, 1 plot for ever parameter_type.
   generate_parameter_subplot <- function(data, parameter_type) {
-  #chooses column names and title according to chosen parameter_type.
+    #chooses column names and title according to chosen parameter_type.
     if (parameter_type == "v") {
-    title <- bquote(paste("drift rate (", italic("v"), ")"))
-    mean_dynamic <- sym(names(data)[2])
-    mean_static <- sym(names(data)[4])
-    sd_dynamic <- sym(names(data)[3])
-    sd_static <- sym(names(data)[5]) 
-  } else if (parameter_type == "a") {
-    columns <- c(1, 6:9)
-    title <- bquote(paste("Entscheidungsschwelle (", italic("a"), ")"))
-    mean_dynamic <- sym(names(data)[6])
-    mean_static <- sym(names(data)[8])
-    sd_dynamic <- sym(names(data)[7])
-    sd_static <- sym(names(data[9]))
-  } else if (parameter_type == "ndt") {
-    columns <- c(1, 10:13)
+      title <- bquote(paste("drift rate (", italic("v"), ")"))
+      mean_dynamic <- sym(names(data)[2])
+      mean_static <- sym(names(data)[4])
+      sd_dynamic <- sym(names(data)[3])
+      sd_static <- sym(names(data)[5]) 
+    } else if (parameter_type == "a") {
+      columns <- c(1, 6:9)
+      title <- bquote(paste("Entscheidungsschwelle (", italic("a"), ")"))
+      mean_dynamic <- sym(names(data)[6])
+      mean_static <- sym(names(data)[8])
+      sd_dynamic <- sym(names(data)[7])
+      sd_static <- sym(names(data[9]))
+    } else if (parameter_type == "ndt") {
+      columns <- c(1, 10:13)
       title <- bquote(paste("non-decision-time (", italic(tau), ")"))
-    mean_dynamic <- sym(names(data)[10])
-    mean_static <- sym(names(data)[12])
-    sd_dynamic <- sym(names(data)[11])
-    sd_static <- sym(names(data)[13])
-  } else {
-    stop("Invalid parameter_type. Use 'v', 'a', or 'ndt'.")
-  }
-  #calculates ymin/ymax of mean + sd
+      mean_dynamic <- sym(names(data)[10])
+      mean_static <- sym(names(data)[12])
+      sd_dynamic <- sym(names(data)[11])
+      sd_static <- sym(names(data)[13])
+    } else {
+      stop("Invalid parameter_type. Use 'v', 'a', or 'ndt'.")
+    }
+    #calculates ymin/ymax of mean + sd
     ymax <- max(data %>%
                   rowwise() %>%
                   mutate(max_expr = pmax(!!mean_dynamic + !!sd_dynamic, !!mean_static + !!sd_static)) %>%
@@ -113,13 +113,32 @@ generate_parameter_plot <- function(data, condition) {
                   pull(min_expr), na.rm = TRUE)
     
     #people start in different condition, either speed or accuracy.
-    firstcolour <- ifelse(condition[1]==1, "#FCF3DC80", "#FFFFFF33")# gray60 = speedcondition
-    secondcolour <- ifelse(firstcolour == "#FCF3DC80", "#FFFFFF33", "#FCF3DC80")
-    rects <- data.frame(xstart = seq(0.5,758.5,48), xend = seq(48.5,768.5,48), 
-                        col = rep(c(firstcolour, secondcolour), 8))
+    firstcolour <- ifelse(condition[1]==1,"a","b")    #  "#FCF3DC80", "#FFFFFF33")# gray60 = speedcondition
+    secondcolour <- ifelse(firstcolour == "a", "b","a") #firstcolour == "#FCF3DC80"#"#FFFFFF33", "#FCF3DC80")
+    colours <- hcl.colors(4, palette = "Mint") #colours <- palette.colors(4, "Teal")
+    rects1 <-  data.frame(xstart = seq(0.5, 760.5, 8), xend = seq(8.5, 768.5,8), col = as.character(difficulty[seq(1,768,8)])) #colours[ ____ +1]
+    rects2 <-  data.frame(xstart = seq(0.5,758.5,48), xend = seq(48.5,768.5,48), col = rep(c(firstcolour, secondcolour), 8))
+    if (parameter_type == "v") {
+      rects = rects1
+    } else {
+      rects = rects2
+    }
     
+    # cols  <-  c(
+    #   "firebrick05" = alpha("firebrick", 0.5),  
+    #   "868686_with_less_alpha" = alpha("#7f7f7f",.6),
+    #   "a" = "#FCF3DC80",  # speedcondition
+    #   "b" = "#FFFFFF33",  # accuracycondition
+    #   "0" = "#2A5676",
+    #   "1" = "#498EA4",
+    #   "2" = "#88C3C8",
+    #   "3" = "#D2EEEA",
+    #   "firebrick" = "firebrick", 
+    #   "black" = "black"
+    #   )
 #generates 1 plot.
-p1 <- data %>%
+p1 <-
+  data %>%
   ggplot() +
   geom_rect(data=rects, aes(ymin=ymin, ymax=ymax, xmin=xstart, xmax=xend, fill=col), alpha =0.5) + #background for condition
   geom_line(aes(x = 1:768, y = !!mean_dynamic, color = "firebrick"), linewidth = .5) +
@@ -143,34 +162,54 @@ p1 <- data %>%
       "Mittelw. dynamisches DDM",
       "Mittelw. stationäres DDM"
     ),
-    name = ""
-  ) +
+    name = "",
+    drop = T
+    ) +
   scale_fill_manual(
     values = c(
-    # "firebrick" = alpha("firebrick", 1),  # 
       "firebrick05" = alpha("firebrick", 0.5),  
-     # "steelblue" = alpha("steelblue", 1),  
-      "868686_with_less_alpha" = alpha("#7f7f7f",.6), #alpha("black", 0.5), #= ifelse(parameter_type=="a", "white", alpha("#868686", 0.5)),  # static model,  inter-trial-var. with alpha=0.5
-      "#FCF3DC80" = "#FCF3DC80",  # speedcondition
-      "#FFFFFF33" = "#FFFFFF33"  # accuracycondition
+      "868686_with_less_alpha" = alpha("#7f7f7f",.6),
+      "a" = "#FCF3DC80",  # speedcondition
+      "b" = "white",  # accuracycondition
+     "0" = "#D2EEEA",
+     "1" = "#88C3C8",
+     "2" = "#498EA4",
+     "3" = "#2A5676"
+    ),
+    breaks = c(
+      "firebrick05",  
+      "868686_with_less_alpha",
+     "0",
+     "1",
+     "2",
+     "3",
+     "a",  # speedcondition
+     "b"
     ),
     limits = c(
-    #  "firebrick", 
-      "firebrick05", 
-    #  "steelblue", 
-     "868686_with_less_alpha", #can be white inside! 
-      "#FCF3DC80", 
-      "#FFFFFF33"
+          "firebrick05",  
+      "868686_with_less_alpha",
+     "0",
+     "1",
+     "2",
+     "3",
+     "a",  # speedcondition
+     "b"
     ),
     labels = c(
      # "Mittelw.dynamisches DDM", 
       "SD dynamisches DDM", 
       #"fast-dm Schätzung", 
-      ifelse(parameter_type=="a",element_blank(),"SD stationäres DDM"), # Parameter a doesn't have an SD.
-      "Geschwindigkeitsbedingung", 
+      "SD statisches DDM", # Parameter a doesn't have an SD.  ifelse(parameter_type=="a",element_blank(),
+      "Schwierigkeit 1",
+      "Schwierigkeit 2",
+      "Schwierigkeit 3",
+      "Schwierigkeit 4",
+      "Geschwindigkeits- \n bedingung",
       ""
     ),
-    name = ""
+    name = "",
+    drop = T
   )  +
   guides(
     color = guide_legend(order = 1, nrow = 2),
@@ -188,8 +227,9 @@ p1 <- data %>%
            #remove.x.gridlines = F) +
   theme(
     legend.title = element_text( size=5), 
-    legend.text=element_text(size=11),
-    legend.position = if_else(parameter_type=="ndt","bottom","none"),
+    legend.text=element_text(size=8),
+    legend.position = ifelse(parameter_type=="ndt", "bottom" ,"none"), # bottom left
+    legend.justification = ifelse(parameter_type=="ndt", c(0,0) ,"none"), # bottom left
     legend.margin=margin(0,0,0,0),
     legend.box.margin=margin(0,0,0,0),
     legend.box.spacing = unit(0, "pt"),
@@ -205,10 +245,8 @@ p1 <- data %>%
     # panel.background = element_blank(),
 #    panel.grid.major = element_line(colour="#ececec", linewidth = .2)
   )
-  
-  
   #parameter_comparison <- p1 / p2 # + plot_layout(widths = c(2, 1))
-  return(p1)
+  #return(p1)
   }
   
   #now the subplot function is used on every parameter
@@ -221,12 +259,71 @@ p1 <- data %>%
   #return(parameter_comparison)
   return(parameter_comparison)
 }
-#generate_parameter_plot(data,condition)
-#ggsave("C:/Users/steff/Documents/Universität/Master Psychologie/SS 2022/Masterarbeit/Bilder/parameter_comparison/parametercomparison_TEST_M1.png" ,  width = 7500, height = 5000, units = "px", dpi = 600)
+generate_parameter_plot(data,condition, difficulty)
+ggsave("C:/Users/steff/Documents/Universität/Master Psychologie/SS 2022/Masterarbeit/Bilder/parameter_comparison/parametercomparison_TEST_M1.png" ,  width = 7500, height = 5000, units = "px", dpi = 600)
 ```
 
+```{r}
+generate_comparison_plot_rt <-function(data) {
+ggplot(data = data, aes(x = factor(difficulty), y = median_response_time, color = Berechnung)) +
+  geom_point(size = 3, position = position_dodge(width = 0.6)) +
+  geom_errorbar(aes(ymin = data$lower_ci_rt, ymax = data$upper_ci_rt), width = 0.2, position = position_dodge(width = 0.6)) +
+  geom_line(aes(group = Berechnung), position = position_dodge(width = 0.6), linewidth = .5) +
+  labs(x = "Schwierigkeit", y = "Reaktionszeit") +
+  ggtitle("simulierte und echte Reaktionszeit") +
+  scale_color_manual(
+    labels = c('emp. Reaktionszeit', 'dynamisches DDM', 'statisches DDM'),  # Optionally, specify custom labels
+    breaks = c('Real Data', 'BayesFlow', 'STAN'),  # TODO check whether they are in correct order
+    values = c('Real Data' = 'grey', 'BayesFlow' = 'red', 'STAN' = 'steelblue')  # Optionally, specify custom colors
+  ) +
+  scale_x_discrete(breaks =c(0,1,2,3), labels = c(1,2,3,4)) +
+  scale_y_continuous(limits=c(min(data$lower_ci_rt), max(data$upper_ci_rt)),
+                      labels = function(x) sprintf("%.1f", x) %>% stringr::str_replace("\\.", ",")
+                      ) +
+  theme_apa() +
+  facet_wrap(~condition, scales = "free_y")
+}
+generate_comparison_plot_rt(combined_summary_individual_complete)
+
+generate_comparison_plot_acc <-function(data, individual) {
+  if (individual == TRUE) {
+    shape = rep(c(rep(19,8), rep(17,4)),2)
+  } else  {
+    shape = rep(19,24)
+  }
+  sequence <- round(seq(min(c(data$lower_ci_acc, data$median_accuracy), na.rm = T)-0.1, max(c(data$lower_ci_acc, data$median_accuracy), na.rm = T)+0.09, by = 0.01),2)
+  sequence <- sequence[floor(sequence * 100) %% 10 == 0]
+  labels_in_percent <- sprintf("%d%%", sequence * 100)
+  
+  
+ggplot(data = data, aes(x = factor(difficulty), y = median_accuracy, color = Berechnung)) +
+  geom_point(size = 3, position = position_dodge(width = 0.6), shape = shape) +
+    geom_errorbar(
+    stat='identity',
+    aes(
+      ymin= lower_ci_acc,
+      ymax = upper_ci_acc),
+    width = 0.2, position = position_dodge(width = 0.6)
+  ) +
+  geom_line(aes(group = Berechnung), position = position_dodge(width = 0.6), linewidth = .5) +
+  labs(x = "Schwierigkeit", y = "Genauigkeit") +
+  ggtitle("simulierte und echte Genauigkeit in %") +
+  scale_color_manual(
+    labels = c('emp. Genauigkeit', 'dynamisches DDM', 'statisches DDM'),  # Optionally, specify custom labels
+    breaks = c('Real Data', 'BayesFlow', 'STAN'),  # TODO check whether they are in correct order
+    values = c('Real Data' = 'grey', 'BayesFlow' = 'red', 'STAN' = 'steelblue')  # Optionally, specify custom colors
+  ) +
+  scale_x_discrete(breaks =c(0,1,2,3), labels = c(1,2,3,4)) +
+  scale_y_continuous(limits=c(min(c(data$lower_ci_acc, data$median_accuracy)),max(c(data$lower_ci_acc, data$median_accuracy))), breaks = sequence, labels = labels_in_percent) +
+  theme_apa() +
+  facet_wrap(~condition, scales = "free_y")
+}
+
+generate_comparison_plot_acc(combined_summary_individual_complete, individual = TRUE)
+#generate_comparison_plot_rt(combined_summary_all, median_response_time)
 
 
+```
 load stationary models.
 ```{r load all stationary models}
 #takes a long time to load
@@ -239,7 +336,7 @@ ldf <- lapply(filenames, read_rds)
 
 
 Create 1 graph for parameter comparison and 1 for rt comparison, both for 14 people individually and rt comparison also for all
-```{r data resimulation for rt comparison NEW VERSION}
+```{r data resimulation for rt comparison}
 set.seed(123)
 person=1 #person
 resimulation=1 #1 of 100 resimulations 
@@ -318,10 +415,9 @@ for (person in 1:14) { #unique(df$id)
     
   )
   #create plot and save it
-  generate_parameter_plot(data, condition)
+  generate_parameter_plot(data, condition, difficulty)
   ggsave(paste0("C:/Users/steff/Documents/Universität/Master Psychologie/SS 2022/Masterarbeit/Bilder/parameter_comparison/parametercomparison_subj_", person,"_M1.svg") ,  width = 7500, height = 5000, units = "px", dpi = 600)
   ggsave(paste0("C:/Users/steff/Documents/Universität/Master Psychologie/SS 2022/Masterarbeit/Bilder/parameter_comparison/parametercomparison_subj_", person,"_M1.png") ,  width = 7500, height = 5000, units = "px", dpi = 600)
-  
   
   #NEW PLOT: true rt vs predicted rts
   #In this plot we want to compare real data rt with simulated data rt from the 2 models. We want to calculate:
@@ -365,7 +461,8 @@ for (person in 1:14) { #unique(df$id)
         correct_fake = correct_sim_static,
         trial = 1:length(rt_sim_static),
         difficulty = difficulty,
-        condition = condition)
+        condition = condition,
+        resimulation = resimulation)
     
     temp_simulation_dynamic <-
       tibble(
@@ -373,7 +470,8 @@ for (person in 1:14) { #unique(df$id)
         correct_fake = correct_sim_dynamic,
         trial = 1:length(rt_sim_dynamic),
         difficulty = difficulty,
-        condition = condition)
+        condition = condition,
+        resimulation = resimulation)
     
     #         tibble(
     #           response_time_fake = rt_sim_bf,
@@ -404,115 +502,158 @@ for (person in 1:14) { #unique(df$id)
   
   rm(simulation_complete_dynamic)
   rm(simulation_complete_static)
-  
-  
-  df_2 <- df %>% #real data
-    filter(tutorial == 0) %>% #we don't use the tutorial
-    mutate(
-      Berechnung = "Real Data",
-      condition = if_else(speed_condition == 0, "Genauigkeitsbedingung", "Geschwindigkeitsbedingung")
-    ) %>% 
-    group_by(condition, difficulty, Berechnung) %>% #for each condition*difficulty*Berechnung of real data we want a median and mad of rt
-    summarize(
-      median_response_time = median(rt),
-      lower_ci = median_response_time - mad(rt),  #qt(0.975, n() - 1) * sd(rt) / sqrt(n()),
-      upper_ci = median_response_time + mad(rt)         #qt(0.975, n() - 1) * sd(rt) / sqrt(n())
-    )
-  
-  combined_summary_all <- simulation_complete_all_14people %>% #for each condition*difficulty*Berechnung of simulated data we want a median and mad of rt
-    mutate(condition = if_else(condition == 0, "Genauigkeitsbedingung", "Geschwindigkeitsbedingung")
-    ) %>% 
-    group_by(condition, difficulty, Berechnung) %>%
-    summarize(
-      median_response_time = median(response_time_fake),
-      lower_ci = median_response_time - mad(response_time_fake), #qt(0.975, n() - 1) * sd(response_time_fake) / sqrt(n()),
-      upper_ci = median_response_time + mad(response_time_fake) #qt(0.975, n() - 1) * sd(response_time_fake) / sqrt(n())
-    ) %>%
-    bind_rows( #add real data to object
-      .,
-      df_2)
-  
-  combined_summary_all$Berechnung <- factor(
-    combined_summary_all$Berechnung, 
-    levels = c('Real Data', 'BayesFlow', 'STAN')
-  )
-  
-  #plot for all people
-  ggplot(data = combined_summary_all, aes(x = factor(difficulty), y = median_response_time, color = Berechnung)) +
-    geom_point(size = 3, position = position_dodge(width = 0.6)) +
-    geom_errorbar(aes(ymin = lower_ci, ymax = upper_ci), width = 0.2, position = position_dodge(width = 0.6)) +
-    geom_line(aes(group = Berechnung), position = position_dodge(width = 0.6), size = .5) +
-    labs(x = "Schwierigkeit", y = "Reaktionszeit") +
-    ggtitle("simulierte und echte Reaktionszeit") +
-    scale_color_manual(
-      labels = c('emp. Reaktionszeit', 'dynamisches DDM', 'stationäres DDM'),  # Optionally, specify custom labels
-      breaks = c('Real Data', 'BayesFlow', 'STAN'),  # TODO check whether they are in correct order
-      values = c('Real Data' = 'grey', 'BayesFlow' = 'red', 'STAN' = 'steelblue')  # Optionally, specify custom colors
-    ) +
-    scale_x_discrete(breaks =c(0,1,2,3), labels = c(1,2,3,4)) +
-    scale_y_continuous(limits=c(min(combined_summary_all$lower_ci), max(combined_summary_all$upper_ci))) +
-    theme_apa() +
-    facet_wrap(~condition, scales = "free_y")
-  
-  ggsave(paste0("C:/Users/steff/Documents/Universität/Master Psychologie/SS 2022/Masterarbeit/Bilder/rt_comparison/rt_comparison_ALL_M1.png"),  width = 6500, height = 4550, units = "px", dpi = 800)
-    ggsave(paste0("C:/Users/steff/Documents/Universität/Master Psychologie/SS 2022/Masterarbeit/Bilder/rt_comparison/rt_comparison_ALL_M1.svg"),  width = 6500, height = 4550, units = "px", dpi = 800)
 }
 
-#individual Plots
-for (person in 1:14) {
-  
-df_2 <- df %>% 
-  filter(tutorial == 0,
-         id == person) %>% 
+df_rt <- df %>% #real data
+  filter(tutorial == 0) %>% #we don't use the tutorial
   mutate(
     Berechnung = "Real Data",
     condition = if_else(speed_condition == 0, "Genauigkeitsbedingung", "Geschwindigkeitsbedingung")
   ) %>% 
-  group_by(condition, difficulty, Berechnung) %>%
+  group_by(condition, difficulty, Berechnung) %>% #for each condition*difficulty*Berechnung of real data we want a median and mad of rt
   summarize(
     median_response_time = median(rt),
-    lower_ci = median_response_time - mad(rt),#qt(0.975, n() - 1) * sd(rt) / sqrt(n()),
-    upper_ci = median_response_time + mad(rt) #qt(0.975, n() - 1) * sd(rt) / sqrt(n())
+    lower_ci_rt = median_response_time - stats::mad(rt),  #qt(0.975, n() - 1) * sd(rt) / sqrt(n()),
+    upper_ci_rt = median_response_time + stats::mad(rt))         #qt(0.975, n() - 1) * sd(rt) / sqrt(n()
+
+df_acc <- df %>% #real data
+  filter(tutorial == 0) %>% #we don't use the tutorial
+  mutate(
+    Berechnung = "Real Data",
+    condition = if_else(speed_condition == 0, "Genauigkeitsbedingung", "Geschwindigkeitsbedingung")
+  ) %>% 
+  group_by(condition, difficulty, Berechnung, id) %>% #for each condition*difficulty*Berechnung of real data we want a median and mad of rt
+  summarize(
+    accuracy = mean(correct)) %>% 
+  group_by(condition, difficulty, Berechnung) %>% 
+  summarize(
+    median_accuracy =median(accuracy),
+    lower_ci_acc = median_accuracy - stats::mad(accuracy),  #qt(0.975, n() - 1) * sd(rt) / sqrt(n()),
+    upper_ci_acc = median_accuracy + stats::mad(accuracy) 
   )
 
-combined_summary_all <- simulation_complete_all_14people %>%
+df_complete <- df_rt %>%
+  left_join(df_acc, by = c("condition", "difficulty", "Berechnung"))
+
+combined_summary_all_rt <- simulation_complete_all_14people %>% #for each condition*difficulty*Berechnung of simulated data we want a median and mad of rt and mean of rt
   mutate(condition = if_else(condition == 0, "Genauigkeitsbedingung", "Geschwindigkeitsbedingung")
-  ) %>% 
-  filter(
-    person == .env$person
   ) %>% 
   group_by(condition, difficulty, Berechnung) %>%
   summarize(
     median_response_time = median(response_time_fake),
-    lower_ci = median_response_time - mad(response_time_fake),# qt(0.975, n() - 1) * sd(response_time_fake) / sqrt(n()),
-    upper_ci = median_response_time + mad(response_time_fake) #qt(0.  975, n() - 1) * sd(response_time_fake) / sqrt(n())
-  ) %>%
-  bind_rows(
-    .,
-    df_2)
+    lower_ci_rt = median_response_time - mad(response_time_fake), #qt(0.975, n() - 1) * sd(response_time_fake) / sqrt(n()),
+    upper_ci_rt = median_response_time + mad(response_time_fake)  #qt(0.975, n() - 1) * sd(response_time_fake) / sqrt(n())
+  )
 
-combined_summary_all$Berechnung <- factor(
-  combined_summary_all$Berechnung, 
+combined_summary_all_acc <- simulation_complete_all_14people %>% #for each condition*difficulty*Berechnung of simulated data we want a median and mad of rt and mean of rt
+  mutate(condition = if_else(condition == 0, "Genauigkeitsbedingung", "Geschwindigkeitsbedingung")
+  ) %>% 
+  group_by(condition, difficulty, Berechnung, person, resimulation) %>%
+  summarize(
+    accuracy = mean(correct_fake)) %>% 
+  group_by(condition, difficulty, Berechnung) %>% 
+  summarize(
+    median_accuracy =median(accuracy),
+    lower_ci_acc = median_accuracy - stats::mad(accuracy),  #qt(0.975, n() - 1) * sd(rt) / sqrt(n()),
+    upper_ci_acc = median_accuracy + stats::mad(accuracy)
+  )
+
+
+combined_summary_all_complete <- combined_summary_all_rt %>%
+  left_join(combined_summary_all_acc, by = c("condition", "difficulty", "Berechnung")) %>% 
+  bind_rows( #add real data to object
+    .,
+    df_complete)
+
+combined_summary_all_complete$Berechnung <- factor(
+  combined_summary_all_complete$Berechnung, 
   levels = c('Real Data', 'BayesFlow', 'STAN')
 )
 
-ggplot(data = combined_summary_all, aes(x = factor(difficulty), y = median_response_time, color = Berechnung)) +
-  geom_point(size = 3, position = position_dodge(width = 0.6)) +
-  geom_errorbar(aes(ymin = lower_ci, ymax = upper_ci), width = 0.2, position = position_dodge(width = 0.6)) +
-  geom_line(aes(group = Berechnung), position = position_dodge(width = 0.6), size = .5) +
-  labs(x = "Schwierigkeit", y = "Reaktionszeit") +
-  ggtitle("simulierte und echte Reaktionszeit") +
-  scale_color_manual(
-    labels = c('emp. Reaktionszeit', 'dynamisches DDM', 'stationäres DDM'),  # Optionally, specify custom labels
-    breaks = c('Real Data', 'BayesFlow', 'STAN'),  # TODO check whether they are in correct order
-    values = c('Real Data' = 'grey', 'BayesFlow' = 'red', 'STAN' = 'steelblue')  # Optionally, specify custom colors
-  ) +
-  scale_x_discrete(breaks =c(0,1,2,3), labels = c(1,2,3,4)) +
-  scale_y_continuous(limits=c(min(combined_summary_all$lower_ci), max(combined_summary_all$upper_ci))) +
-  theme_apa() +
-  facet_wrap(~condition, scales = "free_y")
-  ggsave(paste0("C:/Users/steff/Documents/Universität/Master Psychologie/SS 2022/Masterarbeit/Bilder/rt_comparison/MAD/rt_comparison_subj_", person, "_MAD_M1.png"),  width = 6500, height = 4550, units = "px", dpi = 800)
-    ggsave(paste0("C:/Users/steff/Documents/Universität/Master Psychologie/SS 2022/Masterarbeit/Bilder/rt_comparison/MAD/rt_comparison_subj_", person, "_MAD_M1.svg"),  width = 6500, height = 4550, units = "px", dpi = 800)
+#plot for all people, rt
+
+generate_comparison_plot_rt(combined_summary_all_complete)
+ggsave(paste0("C:/Users/steff/Documents/Universität/Master Psychologie/SS 2022/Masterarbeit/Bilder/rt_comparison/rt_comparison_ALL_M1.png"),  width = 6500, height = 4550, units = "px", dpi = 800)
+ggsave(paste0("C:/Users/steff/Documents/Universität/Master Psychologie/SS 2022/Masterarbeit/Bilder/rt_comparison/rt_comparison_ALL_M1.svg"),  width = 6500, height = 4550, units = "px", dpi = 800)
+
+##plot for all people, acc
+generate_comparison_plot_acc(combined_summary_all_complete, FALSE)
+
+ggsave(paste0("C:/Users/steff/Documents/Universität/Master Psychologie/SS 2022/Masterarbeit/Bilder/acc_comparison/acc_comparison_ALL_M1.png"),  width = 6500, height = 4550, units = "px", dpi = 800)
+ggsave(paste0("C:/Users/steff/Documents/Universität/Master Psychologie/SS 2022/Masterarbeit/Bilder/acc_comparison/acc_comparison_ALL_M1.svg"),  width = 6500, height = 4550, units = "px", dpi = 800)
+
+#individual Plots
+for (person in 1:14) {
+  
+  df_complete <- df %>% #real data
+  filter(tutorial == 0,
+         id == .env$person) %>% #we don't use the tutorial
+  mutate(
+    Berechnung = "Real Data",
+    condition = if_else(speed_condition == 0, "Genauigkeitsbedingung", "Geschwindigkeitsbedingung")
+  ) %>% 
+  group_by(condition, difficulty, Berechnung) %>% #for each condition*difficulty*Berechnung of real data we want a median and mad of rt
+  summarize(
+    median_response_time = median(rt),
+    lower_ci_rt = median_response_time - stats::mad(rt),  #qt(0.975, n() - 1) * sd(rt) / sqrt(n()),
+    upper_ci_rt = median_response_time + stats::mad(rt),
+    median_accuracy = mean(correct)
+    )         #qt(0.975, n() - 1) * sd(rt) / sqrt(n()
+
+  
+combined_summary_individual_rt <- simulation_complete_all_14people %>% #for each condition*difficulty*Berechnung of simulated data we want a median and mad of rt and mean of rt
+      filter(
+      person == .env$person
+    ) %>% 
+  mutate(condition = if_else(condition == 0, "Genauigkeitsbedingung", "Geschwindigkeitsbedingung")
+  ) %>% 
+  group_by(condition, difficulty, Berechnung) %>%
+  summarize(
+    median_response_time = median(response_time_fake),
+    lower_ci_rt = median_response_time - mad(response_time_fake), #qt(0.975, n() - 1) * sd(response_time_fake) / sqrt(n()),
+    upper_ci_rt = median_response_time + mad(response_time_fake)  #qt(0.975, n() - 1) * sd(response_time_fake) / sqrt(n())
+  )
+
+combined_summary_individual_acc <- simulation_complete_all_14people %>% #for each condition*difficulty*Berechnung of simulated data we want a median and mad of rt and mean of rt
+      filter(
+      person == .env$person
+    ) %>% 
+  mutate(condition = if_else(condition == 0, "Genauigkeitsbedingung", "Geschwindigkeitsbedingung")
+  ) %>% 
+  group_by(condition, difficulty, Berechnung, person, resimulation) %>%
+  summarize(
+    accuracy = mean(correct_fake)) %>% 
+  group_by(condition, difficulty, Berechnung) %>% 
+  summarize(
+    median_accuracy =median(accuracy),
+    lower_ci_acc = median_accuracy - stats::mad(accuracy),  #qt(0.975, n() - 1) * sd(rt) / sqrt(n()),
+    upper_ci_acc = median_accuracy + stats::mad(accuracy)
+  )
+
+
+combined_summary_individual_complete <- combined_summary_individual_rt %>%
+  left_join(combined_summary_individual_acc, by = c("condition", "difficulty", "Berechnung")) %>% 
+  bind_rows( #add real data to object
+    .,
+    df_complete)
+
+combined_summary_individual_complete$Berechnung <- factor(
+  combined_summary_individual_complete$Berechnung, 
+  levels = c('Real Data', 'BayesFlow', 'STAN')
+)
+
+  
+  
+  
+  #individual plot, rt
+generate_comparison_plot_rt(combined_summary_individual_complete)
+  ggsave(paste0("C:/Users/steff/Documents/Universität/Master Psychologie/SS 2022/Masterarbeit/Bilder/rt_comparison/rt_comparison_subj_", person, "_MAD_M1.png"),  width = 6500, height = 4550, units = "px", dpi = 800)
+  ggsave(paste0("C:/Users/steff/Documents/Universität/Master Psychologie/SS 2022/Masterarbeit/Bilder/rt_comparison/rt_comparison_subj_", person, "_MAD_M1.svg"),  width = 6500, height = 4550, units = "px", dpi = 800)
+  
+  #individual plot, acc
+generate_comparison_plot_acc(combined_summary_individual_complete, TRUE)
+  ggsave(paste0("C:/Users/steff/Documents/Universität/Master Psychologie/SS 2022/Masterarbeit/Bilder/acc_comparison/acc_comparison_subj_", person, "_M1.png"),  width = 6500, height = 4550, units = "px", dpi = 800)
+  ggsave(paste0("C:/Users/steff/Documents/Universität/Master Psychologie/SS 2022/Masterarbeit/Bilder/acc_comparison/acc_comparison_subj_", person, "_M1.svg"),  width = 6500, height = 4550, units = "px", dpi = 800)
 }
 
 ```
