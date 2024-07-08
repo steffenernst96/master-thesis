@@ -1,14 +1,15 @@
 if (!require("pacman"))
   install.packages("pacman")
 library(pacman)
-p_load(tidyverse, janitor)
-setwd(
-  "C:/Users/steff/Documents/Universität/Master Psychologie/SS 2022/Masterarbeit/Experiment/Daten"
-)
+p_load(tidyverse, janitor, httr, jsonlite)
+
+#cdd <- read_csv("C:/Users/steff/Documents/Universität/Master Psychologie/Masterarbeit/Skripte/Daten_cleaned/df_min.csv") #TODO
+setwd(dirname(rstudioapi::getActiveDocumentContext()$path)) #sets Path to where file is downloaded
+dir.create(path = "Data_cleaned")
 options(encoding = "UTF-8")
-ds = read.delim(
-  #Befehl für Sosci-Survey-Daten
-  file = "Demographie\\rdata_sozialdemographiefragebogenPSYHD_2023-04-20_15-20.csv",
+ds = read.delim(#boilerplate for data from soscisurvey, the raw file is downloaded from github.
+  
+  file = "https://raw.githubusercontent.com/steffenernst96/master-thesis/main/data_raw/rdata_sozialdemographiefragebogenPSYHD_2023-04-20_15-20.csv", #this loads the demographic variables
   encoding = "UTF-8",
   fileEncoding = "UTF-8",
   header = FALSE,
@@ -121,11 +122,10 @@ ds = read.delim(
   comment.char = "",
   na.strings = ""
 )
-##Demographiefragebogen wird eingefügt
+
 ds <- ds %>%
-  #   slice(-1) %>% #erster Fragebogen fehlerhaft
   mutate(
-    haendig1 = ifelse(ds$SD05_01_1, 1, # aus 3 Variablen wird 1 gemacht. 1 für links, 2 für beides, 3 für rechts.
+    haendig1 = ifelse(ds$SD05_01_1, 1, # converts 3 binary variables to a single one. Question about left/righthandedness. 1 = left, 2 = both, 3 = right
                       ifelse(
                         ds$SD05_01_2, 2,
                         ifelse(ds$SD05_01_3, 3, NA)
@@ -145,12 +145,12 @@ ds <- ds %>%
                         ds$SD05_04_2, 2,
                         ifelse(ds$SD05_04_3, 3, NA)
                       )),
-    code = tolower(paste0(CO01_01, CO01_02, CO01_03)) #code zum zusammenführen der Daten
+    code = tolower(paste0(CO01_01, CO01_02, CO01_03)) #code to combine datasets.
   ) %>%
-  slice(-1) %>%  #leere Codezeile
+  slice(-1) %>%  #empty row
   rowwise() %>%
-  mutate(haendig_mean = mean(c(haendig1, haendig2, haendig3, haendig4))) %>% #avg. score
-  select(
+  mutate(haendig_mean = mean(c(haendig1, haendig2, haendig3, haendig4))) %>% #avg. score for handedness variables
+  select( #select variables that are of interest
     c(
       "SD01",
       "SD02_01",
@@ -182,12 +182,17 @@ colnames(ds) <-
   )
 
 
+response <- GET("https://api.github.com/repos/steffenernst96/master-thesis/contents/data_raw") #get urls of raw data
+files <- fromJSON(content(response, "text")) #get files from github
 
-df <-
-  list.files(pattern = "*.csv") %>% #alle Datensätze werden in einen großen Datensatz geladen
-  map_df(~ read_csv(.))
-#to-dos: count Bildershuffle Serie und count Bildershuffle Tutorial löschen
-keeplist <-
+download_url <- files %>%
+  filter(grepl("^subject", name)) %>% #get all data except sociodemographic raw data
+  pull(download_url)
+df <- download_url %>% 
+  map_df(~ read.csv(.))
+
+
+keeplist <- #variables of interest
   c(
     keeplist <-
       c(
@@ -218,65 +223,63 @@ keeplist <-
         "tutorial"
       )
   )
-  df <- df[, names(df) %in% keeplist] %>%
-  mutate(
+df <- df[, names(df) %in% keeplist] %>% #only keep variables of interest
+  mutate( #some cleaning
     difficulty = 3 - difficulty,
-    #umcodierung Schwierigkeit
     difficulty_f = as.factor(difficulty),
-    correct = as.factor(correct),
+    correct = as.numeric(correct),
     correct1 = as.factor(correct1),
     correct2 = as.factor(correct2),
     correct3 = as.factor(correct3),
-    code = paste0(.$id_vater, .$id_jahr, .$id_geburtsort),
-    #code zum Zusammenführen
+    code = paste0(.$id_vater, .$id_jahr, .$id_geburtsort), #individual code to link demographic variables to data from experiment
     count_Block = 1 + count_Blockwerte_zuruecksetzten,
-    #im wiewvielten Block ist man?
     rt = response_time / 1000,
     rt_in_ms = response_time,
     speed_condition = ifelse(block == 'speed', 1, 0),
     resp = if_else(response == "a", 1, 0),
-    correct_resp = if_else(correct_response == "a", 1, 0)
-    )  %>%
-  select(!c(
+    correct_resp = if_else(correct_response == "a", 1, 0),
+    id = dense_rank(factor(subject_nr, levels = unique(subject_nr)))
+  )  %>%
+  select(!c( #remove no longer needed variables
     count_Blockwerte_zuruecksetzten,
     id_vater,
     id_jahr,
     id_geburtsort,
     correct_response,
     response,
-    ))
-df <- df %>%  select(order(colnames(df))) %>% 
-  select(!response_time)
-  #alphabetisch
+    response_time
+  ))
+
+df <- df %>%  select(order(colnames(df))) #order alphabetically / according to subject-nr
 levels(df$difficulty_f) <-
   c("sehr leicht", "eher leicht", "eher schwer", "sehr schwer")
-df <- left_join(df, ds, by = "code")  %>% #zusammenführen nach code
+df <- left_join(df, ds, by = "code")  %>% #combine demographic variables with data from experiment
   clean_names()
 
 df_list <-
-  split(df, df$code) #Wieder Aufteilen in mehrere Datensätze
-# loop over list of data frames and write each to a CSV file
+  split(df, df$code) #split into multiple dataframes
+
+
+# loop over list of data frames and write each to a local CSV file
 for (i in seq_along(df_list)) {
-  #subj_nr <-
-  #  as.numeric(unique(df["code" == names(df_list)[i],"subject_nr"]))
-  
   filename <-
-    paste0("subject_", unique(df_list[[i]]$subject_nr), ".csv") #Name nach SUbject-Nr.
+    paste0("subject_", unique(df_list[[i]]$subject_nr), ".csv") #Name to Subject-Nr.
   write.csv(df_list[[i]],
-            file = paste0("Daten_cleaned\\", filename),
+            file = paste0("Data_cleaned\\", filename),
             row.names = FALSE)
 }
-write.csv(df, file = "Daten_cleaned\\df_all.csv")
+write.csv(df, file = "Data_cleaned\\df_all.csv")
 df_min <- df %>%
   select(rt,
          rt_in_ms,
          correct,
-         block,
+         speed_condition,
          difficulty,
          code,
          tutorial,
-         subject_nr)
-write.csv(df_min, file = "Daten_cleaned\\df_min.csv")
+         subject_nr,
+         id)
+write.csv(df_min, file = "Data_cleaned\\df_min.csv")
 
 
 # df_clean <-  df[,!variabledellist]

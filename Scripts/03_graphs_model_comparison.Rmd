@@ -1,52 +1,57 @@
 ---
-title: "Workflow Stan"
+title: "03_graphs_model_comparison"
 author: "Steffen Ernst"
-date: "2023-05-01"
+date: "2024-06-14"
 output: html_document
 ---
 
-This document outlines how I derived all the model-related graphs from the data and models.
+The code in this document creates model comparison graphs. You need both models to run this script on its own. Because they are rather large they are not available on Github. The stationary models can be created with the code in Script 02. If you want to run this script, don't hesitate to contact me at steffen.e1996@gmail.com and I'll send one or both models to you.
 
-Setup-Chunk.
+
 ```{r setup, include=FALSE}
-
 knitr::opts_chunk$set(echo = TRUE)
 if (!require("pacman")) install.packages("pacman"); library(pacman)
 p_load(tidyverse, janitor, knitr, forcats, bayesplot, RcppParallel,rstan, BayesFactor, bridgesampling, loo, reticulate, jtools, patchwork, brms, emmeans)
-#setwd("C:/Users/steff/Documents/Universität/Master Psychologie/SS 2022/Masterarbeit")
 
-knitr::opts_knit$set(root.dir = "C:/Users/steff/Documents/Universität/Master Psychologie/SS 2022/Masterarbeit")
+setwd(dirname(rstudioapi::getActiveDocumentContext()$path)) #sets Path to where this file is stored
 
 options(mc.cores = parallel::detectCores())
 options(scipen=999)
+
 
 ```
 
 Model data was stored as ndarray
 ```{python npy dataset in python}
 import numpy as np
-posterior_samples_dynamic = np.load("C:/Users/steff/Documents/Universität/Master Psychologie/SS 2022/Masterarbeit/STAN/local_post_samples_mrw.npy") # posteriors as ndarray
+posterior_samples_dynamic = np.load("C:/Users/steff/Documents/Universität/Master Psychologie/Masterarbeit/STAN/local_post_samples_mrw.npy") # posteriors as ndarray
 ```
 
 import from python to R
 ```{r transfer from python to R}
 posterior_samples_dynamic <- py$posterior_samples_dynamic #import into R environment
-#df <- read_csv("C:/Users/steff/Documents/Universität/Master Psychologie/SS 2022/Masterarbeit/Experiment/Daten/Daten_cleaned/special/df_min.csv")
 ```
 
 load the whole dataset for all participants.
 ```{r load dataset}
-df <- read_csv("C:/Users/steff/Documents/Universität/Master Psychologie/SS 2022/Masterarbeit/Experiment/Daten/Daten_cleaned/special/color_discrimination_data.csv")
+df <- read_csv("https://raw.githubusercontent.com/steffenernst96/master-thesis/main/data_cleaned/df_min.csv")
 ```
 
-The following function is used to simulate reaction times (rt) and correct(y/n) from the input variables.
+```{r create folders}
+dir.create(path = "STAN") #create Folder where models are stored.
+dir.create(path = "graphs") #create Folder where graphs are stored.
+dir.create(path = "graphs//parameter_comparison")
+dir.create(path = "graphs//rt_comparison")
+```
+
+The following function is used to simulate reaction times(rt) and correct(y/n) from the input variables.
 
 ```{r wiener-process function}
 wiener_process <- function (v=1, a=1, z=0.5, ndt=0.3) {
   # Standard DDM Model Parameters
   # v   = drift rate
   # a   = boundary separation
-  # z   = starting point; = 0.5 corresponds to no bias
+  # z   = starting point, z=0.5 corresponds to no bias
   # ndt = non-decision time in s
   
   max_iter <- 1e4 # maximum process duration in ms
@@ -72,8 +77,8 @@ wiener_process <- function (v=1, a=1, z=0.5, ndt=0.3) {
 ```
 
 
-This generates parameter development plots for all 3 parameters, v,a,ndt.
-Condition has stored sd and mean values for all parameters. Details on structure in chunk 9.
+This chunk creates a function that generates parameter development plots for all 3 parameters (v, a, ndt).
+condition has stored sd and mean values for all parameters. Details on structure of condition in chunk 10.
 ```{r function generate parameter plot}
 generate_parameter_plot <- function(data, condition, difficulty) { 
   # Creates a combined plot, 1 plot for ever parameter_type.
@@ -116,7 +121,7 @@ generate_parameter_plot <- function(data, condition, difficulty) {
     firstcolour <- ifelse(condition[1]==1,"a","b")    #  "#FCF3DC80", "#FFFFFF33")# gray60 = speedcondition
     secondcolour <- ifelse(firstcolour == "a", "b","a") #firstcolour == "#FCF3DC80"#"#FFFFFF33", "#FCF3DC80")
     colours <- hcl.colors(4, palette = "Mint") #colours <- palette.colors(4, "Teal")
-    rects1 <-  data.frame(xstart = seq(0.5, 760.5, 8), xend = seq(8.5, 768.5,8), col = as.character(difficulty[seq(1,768,8)])) #colours[ ____ +1]
+    rects1 <-  data.frame(xstart = seq(0.5, 760.5, 8), xend = seq(8.5, 768.5,8), col = as.character(difficulty[seq(1,768,8)])) #Background colors according to speed_condition 
     rects2 <-  data.frame(xstart = seq(0.5,758.5,48), xend = seq(48.5,768.5,48), col = rep(c(firstcolour, secondcolour), 8))
     if (parameter_type == "v") {
       rects = rects1
@@ -136,117 +141,118 @@ generate_parameter_plot <- function(data, condition, difficulty) {
     #   "firebrick" = "firebrick", 
     #   "black" = "black"
     #   )
-#generates 1 plot.
-p1 <-
-  data %>%
-  ggplot() +
-  geom_rect(data=rects, aes(ymin=ymin, ymax=ymax, xmin=xstart, xmax=xend, fill=col), alpha =0.5) + #background for condition
-  geom_line(aes(x = 1:768, y = !!mean_dynamic, color = "firebrick"), linewidth = .5) +
-  geom_line(aes(x = 1:768, y = !!mean_static, color = "black"), linewidth = .5) +
-  geom_ribbon(aes(x = 1:768, ymin = !!mean_dynamic - !!sd_dynamic, ymax = !!mean_dynamic + !!sd_dynamic, fill = "firebrick05")) + #, alpha = 0.5
-  geom_ribbon(aes(x = 1:768, ymin = !!mean_static - !!sd_static, ymax = !!mean_static + !!sd_static, fill = "868686_with_less_alpha")) + #,alpha = 0.5
-  scale_x_continuous(breaks =c(breaks = c(1,seq(48, 768, 48))),
-                     labels = c(1,seq(48, 768, 48)),
-                     expand = c(0.01,0.01)
-                     ) +
-  scale_color_manual(
-    values = c(
-      "firebrick" = "firebrick", 
-      "black" = "black"
-    ),
-    limits = c(
-      "firebrick", 
-      "black"
-    ),
-    labels = c(
-      "Mittelw. dynamisches DDM",
-      "Mittelw. stationäres DDM"
-    ),
-    name = "",
-    drop = T
-    ) +
-  scale_fill_manual(
-    values = c(
-      "firebrick05" = alpha("firebrick", 0.5),  
-      "868686_with_less_alpha" = alpha("#7f7f7f",.6),
-      "a" = "#FCF3DC80",  # speedcondition
-      "b" = "white",  # accuracycondition
-     "0" = "#D2EEEA",
-     "1" = "#88C3C8",
-     "2" = "#498EA4",
-     "3" = "#2A5676"
-    ),
-    breaks = c(
-      "firebrick05",  
-      "868686_with_less_alpha",
-     "0",
-     "1",
-     "2",
-     "3",
-     "a",  # speedcondition
-     "b"
-    ),
-    limits = c(
+    #generates 1 plot.
+    p1 <-
+      data %>%
+      ggplot() +
+      geom_rect(data=rects, aes(ymin=ymin, ymax=ymax, xmin=xstart, xmax=xend, fill=col), alpha =0.5) + #background for condition
+      geom_line(aes(x = 1:768, y = !!mean_dynamic, color = "firebrick"), linewidth = .5) +
+      geom_line(aes(x = 1:768, y = !!mean_static, color = "black"), linewidth = .5) +
+      geom_ribbon(aes(x = 1:768, ymin = !!mean_dynamic - !!sd_dynamic, ymax = !!mean_dynamic + !!sd_dynamic, fill = "firebrick05")) + #, alpha = 0.5
+      geom_ribbon(aes(x = 1:768, ymin = !!mean_static - !!sd_static, ymax = !!mean_static + !!sd_static, fill = "868686_with_less_alpha")) + #,alpha = 0.5
+      ggtitle(expression(italic("geschätzte Parameterentwicklung"))) +
+      scale_x_continuous(breaks =c(breaks = c(1,seq(48, 768, 48))),
+                         labels = c(1,seq(48, 768, 48)),
+                         expand = c(0.01,0.01)
+      ) +
+      scale_color_manual(
+        values = c(
+          "firebrick" = "firebrick", 
+          "black" = "black"
+        ),
+        limits = c(
+          "firebrick", 
+          "black"
+        ),
+        labels = c(
+          "Mittelw. dynamisches DDM",
+          "Mittelw. statisches DDM"
+        ),
+        name = "",
+        drop = T
+      ) +
+      scale_fill_manual(
+        values = c(
+          "firebrick05" = alpha("firebrick", 0.5),  
+          "868686_with_less_alpha" = alpha("#7f7f7f",.6),
+          "a" = "#FCF3DC80",  # speedcondition
+          "b" = "white",  # accuracycondition
+          "0" = "#D2EEEA",
+          "1" = "#88C3C8",
+          "2" = "#498EA4",
+          "3" = "#2A5676"
+        ),
+        breaks = c(
           "firebrick05",  
-      "868686_with_less_alpha",
-     "0",
-     "1",
-     "2",
-     "3",
-     "a",  # speedcondition
-     "b"
-    ),
-    labels = c(
-     # "Mittelw.dynamisches DDM", 
-      "SD dynamisches DDM", 
-      #"fast-dm Schätzung", 
-      "SD statisches DDM", # Parameter a doesn't have an SD.  ifelse(parameter_type=="a",element_blank(),
-      "Schwierigkeit 1",
-      "Schwierigkeit 2",
-      "Schwierigkeit 3",
-      "Schwierigkeit 4",
-      "Geschwindigkeits- \n bedingung",
-      ""
-    ),
-    name = "",
-    drop = T
-  )  +
-  guides(
-    color = guide_legend(order = 1, nrow = 2),
-    fill = guide_legend(order = 2, nrow = 2)
-                    #    override.aes = list(color = c("steelblue", "firebrick")))
-
-  )+
-  labs(
-      title = title,
-      x = element_blank(),
-      y = "Parameter- \nwert",
-  ) +
-  ylim(ymin, ymax) +  
- theme_apa(remove.y.gridlines = F) + 
-           #remove.x.gridlines = F) +
-  theme(
-    legend.title = element_text( size=5), 
-    legend.text=element_text(size=8),
-    legend.position = ifelse(parameter_type=="ndt", "bottom" ,"none"), # bottom left
-    legend.justification = ifelse(parameter_type=="ndt", c(0,0) ,"none"), # bottom left
-    legend.margin=margin(0,0,0,0),
-    legend.box.margin=margin(0,0,0,0),
-    legend.box.spacing = unit(0, "pt"),
-    plot.margin=unit(c(0,0,0,0), "mm"),
-    plot.title = element_text(size=11,
-                              margin = margin(5,0,0,0, "mm")),
-    axis.title.y=element_text(angle=0, vjust=.5, hjust = 0),
-    axis.title.x=element_text(angle=0, 
-                              size=11),
-    axis.text = element_text(size=11)
-    
-    #,
-    # panel.background = element_blank(),
-#    panel.grid.major = element_line(colour="#ececec", linewidth = .2)
-  )
-  #parameter_comparison <- p1 / p2 # + plot_layout(widths = c(2, 1))
-  #return(p1)
+          "868686_with_less_alpha",
+          "0",
+          "1",
+          "2",
+          "3",
+          "a",  # speedcondition
+          "b"
+        ),
+        limits = c(
+          "firebrick05",  
+          "868686_with_less_alpha",
+          "0",
+          "1",
+          "2",
+          "3",
+          "a",  # speedcondition
+          "b"
+        ),
+        labels = c(
+          # "Mittelw.dynamisches DDM", 
+          "SD dynamisches DDM", 
+          #"fast-dm Schätzung", 
+          "SD statisches DDM", # Parameter a doesn't have an SD.  ifelse(parameter_type=="a",element_blank(),
+          "Schwierigkeit 1",
+          "Schwierigkeit 2",
+          "Schwierigkeit 3",
+          "Schwierigkeit 4",
+          "Geschwindigkeits- \n bedingung",
+          ""
+        ),
+        name = "",
+        drop = T
+      )  +
+      guides(
+        color = guide_legend(order = 1, nrow = 2),
+        fill = guide_legend(order = 2, nrow = 2)
+        #    override.aes = list(color = c("steelblue", "firebrick")))
+        
+      )+
+      labs(
+        title = title,
+        x = element_blank(),
+        y = "Parameter- \nwert",
+      ) +
+      ylim(ymin, ymax) +  
+      theme_apa(remove.y.gridlines = F) + 
+      #remove.x.gridlines = F) +
+      theme(
+        legend.title = element_text( size=5), 
+        legend.text=element_text(size=8),
+        legend.position = ifelse(parameter_type=="ndt", "bottom" ,"none"), # bottom left
+        legend.justification = ifelse(parameter_type=="ndt", c(0,0) ,"none"), # bottom left
+        legend.margin=margin(0,0,0,0),
+        legend.box.margin=margin(0,0,0,0),
+        legend.box.spacing = unit(0, "pt"),
+        plot.margin=unit(c(0,0,0,0), "mm"),
+        plot.title = element_text(size=11,
+                                  margin = margin(5,0,0,0, "mm")),
+        axis.title.y=element_text(angle=0, vjust=.5, hjust = 0),
+        axis.title.x=element_text(angle=0, 
+                                  size=11),
+        axis.text = element_text(size=11)
+        
+        #,
+        # panel.background = element_blank(),
+        #    panel.grid.major = element_line(colour="#ececec", linewidth = .2)
+      )
+    #parameter_comparison <- p1 / p2 # + plot_layout(widths = c(2, 1))
+    #return(p1)
   }
   
   #now the subplot function is used on every parameter
@@ -259,31 +265,32 @@ p1 <-
   #return(parameter_comparison)
   return(parameter_comparison)
 }
-generate_parameter_plot(data,condition, difficulty)
-ggsave("C:/Users/steff/Documents/Universität/Master Psychologie/SS 2022/Masterarbeit/Bilder/parameter_comparison/parametercomparison_TEST_M1.png" ,  width = 7500, height = 5000, units = "px", dpi = 600)
+#generate_parameter_plot(data,condition, difficulty)
+#ggsave("C:/Users/steff/Documents/Universität/Master Psychologie/Masterarbeit/Bilder/parameter_comparison/parametercomparison_TEST_M1.png" ,  width = 7500, height = 5000, units = "px", dpi = 600)
 ```
 
-```{r}
+This chunk creates a function that generates a comparison plot. Accuracy and reaction time are simulated based on the paramter values of the stationary and dynamic models. The simulated times are then compared to the real values.
+```{r Generate comparison plot for accuracy and reaction time}
 generate_comparison_plot_rt <-function(data) {
-ggplot(data = data, aes(x = factor(difficulty), y = median_response_time, color = Berechnung)) +
-  geom_point(size = 3, position = position_dodge(width = 0.6)) +
-  geom_errorbar(aes(ymin = data$lower_ci_rt, ymax = data$upper_ci_rt), width = 0.2, position = position_dodge(width = 0.6)) +
-  geom_line(aes(group = Berechnung), position = position_dodge(width = 0.6), linewidth = .5) +
-  labs(x = "Schwierigkeit", y = "Reaktionszeit") +
-  ggtitle("simulierte und echte Reaktionszeit") +
-  scale_color_manual(
-    labels = c('emp. Reaktionszeit', 'dynamisches DDM', 'statisches DDM'),  # Optionally, specify custom labels
-    breaks = c('Real Data', 'BayesFlow', 'STAN'),  # TODO check whether they are in correct order
-    values = c('Real Data' = 'grey', 'BayesFlow' = 'red', 'STAN' = 'steelblue')  # Optionally, specify custom colors
-  ) +
-  scale_x_discrete(breaks =c(0,1,2,3), labels = c(1,2,3,4)) +
-  scale_y_continuous(limits=c(min(data$lower_ci_rt), max(data$upper_ci_rt)),
-                      labels = function(x) sprintf("%.1f", x) %>% stringr::str_replace("\\.", ",")
-                      ) +
-  theme_apa() +
-  facet_wrap(~condition, scales = "free_y")
+  ggplot(data = data, aes(x = factor(difficulty), y = median_response_time, color = Berechnung)) +
+    geom_point(size = 3, position = position_dodge(width = 0.6)) +
+    geom_errorbar(aes(ymin = data$lower_ci_rt, ymax = data$upper_ci_rt), width = 0.2, position = position_dodge(width = 0.6)) +
+    geom_line(aes(group = Berechnung), position = position_dodge(width = 0.6), linewidth = .5) +
+    labs(x = "Schwierigkeit", y = "Reaktionszeit") +
+    ggtitle(expression(italic("simulierte und echte Reaktionszeit"))) +
+    scale_color_manual(
+      labels = c('emp. Reaktionszeit', 'dynamisches DDM', 'statisches DDM'),  # Optionally, specify custom labels
+      breaks = c('Real Data', 'BayesFlow', 'STAN'),  # TODO check whether they are in correct order
+      values = c('Real Data' = 'grey', 'BayesFlow' = 'red', 'STAN' = 'steelblue')  # Optionally, specify custom colors
+    ) +
+    scale_x_discrete(breaks =c(0,1,2,3), labels = c(1,2,3,4)) +
+    scale_y_continuous(limits=c(min(data$lower_ci_rt), max(data$upper_ci_rt))#,
+                       #labels = function(x) sprintf("%.1f", x) %>% stringr::str_replace("\\.", ",")
+    ) +
+    theme_apa() +
+    facet_wrap(~condition) #, scales = "free_y")
 }
-generate_comparison_plot_rt(combined_summary_individual_complete)
+#generate_comparison_plot_rt(combined_summary_individual_complete)
 
 generate_comparison_plot_acc <-function(data, individual) {
   if (individual == TRUE) {
@@ -291,43 +298,41 @@ generate_comparison_plot_acc <-function(data, individual) {
   } else  {
     shape = rep(19,24)
   }
-  sequence <- round(seq(min(c(data$lower_ci_acc, data$median_accuracy), na.rm = T)-0.1, max(c(data$lower_ci_acc, data$median_accuracy), na.rm = T)+0.09, by = 0.01),2)
+  sequence <- round(seq(min(c(data$lower_ci_acc, data$median_accuracy), na.rm = T)-0.1, max(c(data$upper_ci_acc, data$median_accuracy), na.rm = T)+0.09, by = 0.01),2)
   sequence <- sequence[floor(sequence * 100) %% 10 == 0]
-  labels_in_percent <- sprintf("%d%%", sequence * 100)
+  labels_in_percent <- sprintf("%g%%", sequence * 100)
   
   
-ggplot(data = data, aes(x = factor(difficulty), y = median_accuracy, color = Berechnung)) +
-  geom_point(size = 3, position = position_dodge(width = 0.6), shape = shape) +
+  ggplot(data = data, aes(x = factor(difficulty), y = median_accuracy, color = Berechnung)) +
+    geom_point(size = 3, position = position_dodge(width = 0.6), shape = shape) +
     geom_errorbar(
-    stat='identity',
-    aes(
-      ymin= lower_ci_acc,
-      ymax = upper_ci_acc),
-    width = 0.2, position = position_dodge(width = 0.6)
-  ) +
-  geom_line(aes(group = Berechnung), position = position_dodge(width = 0.6), linewidth = .5) +
-  labs(x = "Schwierigkeit", y = "Genauigkeit") +
-  ggtitle("simulierte und echte Genauigkeit in %") +
-  scale_color_manual(
-    labels = c('emp. Genauigkeit', 'dynamisches DDM', 'statisches DDM'),  # Optionally, specify custom labels
-    breaks = c('Real Data', 'BayesFlow', 'STAN'),  # TODO check whether they are in correct order
-    values = c('Real Data' = 'grey', 'BayesFlow' = 'red', 'STAN' = 'steelblue')  # Optionally, specify custom colors
-  ) +
-  scale_x_discrete(breaks =c(0,1,2,3), labels = c(1,2,3,4)) +
-  scale_y_continuous(limits=c(min(c(data$lower_ci_acc, data$median_accuracy)),max(c(data$lower_ci_acc, data$median_accuracy))), breaks = sequence, labels = labels_in_percent) +
-  theme_apa() +
-  facet_wrap(~condition, scales = "free_y")
+      stat='identity',
+      aes(
+        ymin= lower_ci_acc,
+        ymax = upper_ci_acc),
+      width = 0.2, position = position_dodge(width = 0.6)
+    ) +
+    geom_line(aes(group = Berechnung), position = position_dodge(width = 0.6), linewidth = .5) +
+    labs(x = "Schwierigkeit", y = "Genauigkeit") +
+    ggtitle(expression(italic("simulierte und echte Genauigkeit in %"))) +
+    scale_color_manual(
+      labels = c('emp. Genauigkeit', 'dynamisches DDM', 'statisches DDM'),  # Optionally, specify custom labels
+      breaks = c('Real Data', 'BayesFlow', 'STAN'),  # TODO check whether they are in correct order
+      values = c('Real Data' = 'grey', 'BayesFlow' = 'red', 'STAN' = 'steelblue')  # Optionally, specify custom colors
+    ) +
+    scale_x_discrete(breaks =c(0,1,2,3), labels = c(1,2,3,4)) +
+    scale_y_continuous(limits=c(min(c(data$lower_ci_acc, data$median_accuracy))-0.1,max(c(data$upper_ci_acc, data$median_accuracy))+0.1), labels = scales::percent)+#, breaks = sequence, labels = labels_in_percent) +#, expand = c(0.02, 0.02)) +
+    theme_apa() +
+    facet_wrap(~condition)
 }
 
-generate_comparison_plot_acc(combined_summary_individual_complete, individual = TRUE)
-#generate_comparison_plot_rt(combined_summary_all, median_response_time)
-
-
+#generate_comparison_plot_acc(combined_summary_individual_complete, individual = T)
 ```
+
 load stationary models.
 ```{r load all stationary models}
 #takes a long time to load
-filenames <- list.files("C:/Users/steff/Documents/Universität/Master Psychologie/SS 2022/Masterarbeit/STAN", pattern="*.rds", full.names=TRUE)
+filenames <- list.files("STAN", pattern="*.rds", full.names=TRUE)
 ldf <- lapply(filenames, read_rds)
 # 
 # filenames_shortened <-str_sub(filenames, start = -18, end = -5)
@@ -335,14 +340,16 @@ ldf <- lapply(filenames, read_rds)
 ```
 
 
-Create 1 graph for parameter comparison and 1 for rt comparison, both for 14 people individually and rt comparison also for all
-```{r data resimulation for rt comparison}
-set.seed(123)
-person=1 #person
-resimulation=1 #1 of 100 resimulations 
-trial=1 #1 of 768 trials
+Create 1 graph for parameter comparison and 1 for rt&acc comparison, both for 14 people individually and rt&acc comparison also for all
+```{r parameter development graph and rt/acc resimulation graph}
 
-#ldf is weirdly sorted ( 1,10,11, and so on) so we create "position" which finds the correct position in ldf to chose for person. 1-14 in ldf_id are the complex models and 15-28 the simpler ones, we only want these because there were no big differences in the loo_comparison in the STAN Workflow. So we search for the POSITIONS of 15-28 in ldf_id and store them in position.
+####### 1. general prep for both plots 
+set.seed(123)
+#person=1 #person
+#resimulation=1 #1 of 100 resimulations 
+#trial=1 #1 of 768 trials
+
+#ldf is weirdly sorted ( 1,10,11, and so on) so we create "position" which finds the correct position in ldf to chose for person. 1-14 in ldf_id are the complex models and 15-28 the simpler ones, see script 02 for the model comparison between the two stationary model approaches. So we search for the POSITIONS of 15-28 in ldf_id and store them in position.
 
 ldf_id <- c(15, 1, 
             24, 10, 
@@ -362,23 +369,39 @@ position <- match(15:28, ldf_id) # Use the match function to find positions
 
 simulation_complete_all_14people <-  tibble() #stores all the simulated data for the stationary and the dynamic model.
 
-for (person in 1:14) { #unique(df$id)
-  #we filter for person, store some of their data and create empty tibbles.
+person_1_to_14 = 1 #we need to count in 2 ways: first is subject_nr, which is sorted differently than 1:14, e.g. 11 is missing.
+
+
+#This loop iterates over all 14 participants and creates
+#1. "data" which encapsulates the values for v, a and ndt. An Average and standard deviation either over the whole condition ( e.g. 1 average + 1 sd for v for every difficulty) in the static model or an average # sd over the posterior distribution for a single trial for the dynamic model.
+#2. a graph that shows both values.
+#3. Simulated data for accuracy and reaction time based on the static as well as the dynamic modell. This data is then summarized and plotted against the true values from the experiment.
+
+for (person in unique(df$id)) { #
+  #we filter for person and create empty tibbles.
   df_temp <- df %>% filter(id==person, 
                            tutorial==0)
   difficulty <- df_temp$difficulty 
   condition <- df_temp$speed_condition
-  #condition2 <- ifelse(df_temp$speed_condition==1, 4,0) only needed if we use the more complicated model.
-  simulation_complete_static <-  tibble(response_time_fake = double(), correct_fake = integer(), trial = integer(), difficulty = integer(), condition = integer()) #empty tibbles for static  Simulation
+  #condition2 <- ifelse(df_temp$speed_condition==1, 4,0) only needed if we use the more complicated model which we don't
+  simulation_complete_static <-  tibble(response_time_fake = double(), correct_fake = integer(), trial = integer(), difficulty = integer(), condition = integer()) #empty tibbles for static simulation
   simulation_complete_dynamic <-  tibble(response_time_fake = double(), correct_fake = integer(), trial = integer(), difficulty = integer(), condition = integer()) #empty tibbles for bayesflow simulation
+  
+  #  
+  ##  
+  ###
+  #### 1. PLOT: parameter comparison: static vs. dynamic estimation 
+  ###
+  ##
+  #
   
   #we get the parameters we  want from the stationary models, the dynamic model is already loaded.
   #Here we need to use position because we choose from ldf
-  posterior_samples_static <- rstan::extract(ldf[[position[person]]], pars = c("v[1]", "v[2]", "v[3]", "v[4]", "a[1]", "a[2]", "ndt")) # TO CHANGE IF INTERACTION MODEL IS USED: ,"v[5]","v[6]","v[7]","v[8]", 
+  posterior_samples_static <- rstan::extract(ldf[[position[person_1_to_14]]], pars = c("v[1]", "v[2]", "v[3]", "v[4]", "a[1]", "a[2]", "ndt")) # TO CHANGE IF INTERACTION MODEL IS USED: ,"v[5]","v[6]","v[7]","v[8]", 
   
   parameters_to_sample <- c("v[1]", "v[2]", "v[3]", "v[4]", "a[1]", "a[2]", "ndt")
   
-  #This df stores the mean values and sd values for all v[1:4], a[1,2] and ndt for the static model.
+  #This df stores the mean values and SD values for all v[1:4], a[1,2] and ndt for the static model.
   posterior_summary_static <- data.frame(
     position = 1:length(posterior_samples_static),
     mean = sapply(posterior_samples_static, mean),
@@ -388,48 +411,58 @@ for (person in 1:14) { #unique(df$id)
   
   
   #This is the df that is given to generate_parameter_plot.
-  #It consists of Means and sds for the static and dynamic models for each timestep for the dynamic model
-  #and of the calculated means/sds in posterior_summary_static that are identical for each trial with the same difficulty/condition
+  #It consists of Means and SDs for the static and dynamic models for each timestep for the dynamic model
+  #and of the calculated means/SDs in posterior_summary_static that are identical for each trial with the same difficulty/condition
   #for posterior we can use person and not position because it is already sorted.
-  
   data <- data.frame(
     dimension = 1:768,
     
     #v
-    mean_v_dynamic = rowMeans(posterior_samples_dynamic[person, , , 1]),
-    sd_v_dynamic = apply(posterior_samples_dynamic[person, , , 1], 1, sd),
+    mean_v_dynamic = rowMeans(posterior_samples_dynamic[person_1_to_14, , , 1]),
+    sd_v_dynamic = apply(posterior_samples_dynamic[person_1_to_14, , , 1], 1, sd),
     mean_v_static = posterior_summary_static$mean[difficulty+1], # + condition2 IF INTERACTION MODEL
     sd_v_static = posterior_summary_static$sd[difficulty+1],# + condition2 IF INTERACTION MODEL
     
     #a
-    mean_a_dynamic = rowMeans(posterior_samples_dynamic[person, , , 2]),
-    sd_a_dynamic = apply(posterior_samples_dynamic[person, , , 2], 1, sd),
+    mean_a_dynamic = rowMeans(posterior_samples_dynamic[person_1_to_14, , , 2]),
+    sd_a_dynamic = apply(posterior_samples_dynamic[person_1_to_14, , , 2], 1, sd),
     mean_a_static = posterior_summary_static$mean[5 + condition], #9 IF INTERACTION MODEL
     sd_a_static = posterior_summary_static$sd[5 + condition], #9 IF INTERACTION MODEL
     
     #ndt
-    mean_ndt_dynamic = rowMeans(posterior_samples_dynamic[person, , , 3]),
-    sd_ndt_dynamic = apply(posterior_samples_dynamic[person, , , 3], 1, sd),
+    mean_ndt_dynamic = rowMeans(posterior_samples_dynamic[person_1_to_14, , , 3]),
+    sd_ndt_dynamic = apply(posterior_samples_dynamic[person_1_to_14, , , 3], 1, sd),
     mean_ndt_static = posterior_summary_static$mean[7], #11 IF INTERACTION MODEL
     sd_ndt_static = posterior_summary_static$sd[7] # 11 IF INTERACTION MODEL
     
   )
   #create plot and save it
   generate_parameter_plot(data, condition, difficulty)
-  ggsave(paste0("C:/Users/steff/Documents/Universität/Master Psychologie/SS 2022/Masterarbeit/Bilder/parameter_comparison/parametercomparison_subj_", person,"_M1.svg") ,  width = 7500, height = 5000, units = "px", dpi = 600)
-  ggsave(paste0("C:/Users/steff/Documents/Universität/Master Psychologie/SS 2022/Masterarbeit/Bilder/parameter_comparison/parametercomparison_subj_", person,"_M1.png") ,  width = 7500, height = 5000, units = "px", dpi = 600)
+  ggsave(paste0("graphs/parameter_comparison/parametercomparison_subj_", person,"_M1.svg") ,  width = 7500, height = 5000, units = "px", dpi = 600)
+  ggsave(paste0("graphs/parameter_comparison/parametercomparison_subj_", person,"_M1.png") ,  width = 7500, height = 5000, units = "px", dpi = 600)
   
-  #NEW PLOT: true rt vs predicted rts
-  #In this plot we want to compare real data rt with simulated data rt from the 2 models. We want to calculate:
-  #100(resimulation)*768(trial)*14(person)*2(static,dynamic) rts that are summarized as median and MAD
   
-  #for rt comparison plot we only want a sample of 100 of all the posterior samples
-  posterior_samples_dynamic_short <- posterior_samples_dynamic[, , sample(1:4000, 100, replace=F), ] #trim array to 100 of 4000 estimations
+  
+  #  
+  ##  
+  ###
+  #### 2. PLOT: true rt vs predicted reaction times (rt) ##########
+  ###
+  ##
+  #
+
+
+  #In this plot we want to compare real data of rt / acc with simulated data from the 2 models. We want to calculate:
+  #100(resimulation)*768(trial)*14(person)*2(static,dynamic) rts and accs that are summarized as median and MAD (mean absolute deviation)
+
+  #for rt comparison plot we only want a sample of n_resimulations of all the posterior samples
+  n_resimulations = 100 #length(posterior_samples_dynamic_short[1,1,,1])
+  posterior_samples_dynamic_short <- posterior_samples_dynamic[, , sample(1:4000, n_resimulations, replace=F), ] 
   posterior_samples_static_short <- lapply(parameters_to_sample, function(param) {
     sample(posterior_samples_static[[param]], 100, replace = FALSE) #trim the other one as well
   })
   
-  for (resimulation in 1:length(posterior_samples_dynamic_short[1,1,,1])) { 
+  for (resimulation in 1:n_resimulations) { # length(posterior_samples_dynamic_short[1,1,,1])
     
     # set of resimulations.  with hardcoded v1-4 and a1-2. which of these v and a still needs to be decided for every trial
     
@@ -439,23 +472,23 @@ for (person in 1:14) { #unique(df$id)
     correct_sim_dynamic <-  c()
     
     #tibble(response_time_fake = double(), correct_fake = integer(), trial = integer(), difficulty = integer(), condition = integer())
-    for (trial in 1:768) { # for every trial the posterior samples of the dynamic and the static model are loaded and a rt and correct(Y/N) are calculated and stored
+    for (trial in 1:768) { # for every trial the posterior samples of the dynamic and the static model are loaded and a rt and correct(Y/N) are simulated and stored
       v <- posterior_samples_static_short[[1 + difficulty[trial]]] [resimulation] # + condition2[trial] IF INTERACTION STAN #difficulty[trial]  and condition2[trial] is for choosing which v is to use. [j] is for which of the 100 values of that v to use.
       a <- posterior_samples_static_short[[5 + condition[trial]]] [resimulation] # 9 IF INTERACTION STAN
       ndt <- posterior_samples_static_short[[7]] [resimulation] # 11 IF INTERACTION STAN
-      output <- wiener_process(v = v, a = a, ndt = ndt) #function creates rt and correct y/n for the static model
+      output <- wiener_process(v = v, a = a, ndt = ndt) #function simulates rt and correct y/n for the static model
       rt_sim_static <- c(rt_sim_static, output[1]) 
       correct_sim_static <- c(correct_sim_static, output[2])
       
-      v <- posterior_samples_dynamic_short[person,trial,resimulation,1] #dims are [14,768,100,3]
-      a <- posterior_samples_dynamic_short[person,trial,resimulation,2]
-      ndt <- posterior_samples_dynamic_short[person,trial,resimulation,3]
-      output <- wiener_process(v = v, a = a, ndt = ndt) #function creates rt and correct y/n for dynamic model
+      v <- posterior_samples_dynamic_short[person_1_to_14,trial,resimulation,1] #dims are [14,768,100,3]
+      a <- posterior_samples_dynamic_short[person_1_to_14,trial,resimulation,2]
+      ndt <- posterior_samples_dynamic_short[person_1_to_14,trial,resimulation,3]
+      output <- wiener_process(v = v, a = a, ndt = ndt) #function simulates rt and correct y/n for dynamic model
       rt_sim_dynamic <- c(rt_sim_dynamic, output[1])
       correct_sim_dynamic <- c(correct_sim_dynamic, output[2])
     }
     
-    temp_simulation_static <- # put all 768 simulations in a df for 1 resimulation 
+    temp_simulation_static <- # put all 768 trial-simulations in a df for 1 resimulation of whole experiment
       tibble(
         response_time_fake = rt_sim_static,
         correct_fake = correct_sim_static,
@@ -472,23 +505,16 @@ for (person in 1:14) { #unique(df$id)
         difficulty = difficulty,
         condition = condition,
         resimulation = resimulation)
-    
-    #         tibble(
-    #           response_time_fake = rt_sim_bf,
-    #           correct_fake = correct_sim_bf,
-    #           trial = 1:length(rt_sim_bf),
-    #           difficulty = difficulty,
-    #           condition = condition
-    #         )
-    simulation_complete_static <- #combine dfs for resimulations in one df for all simulations
+  
+    simulation_complete_static <- #add 1 simulation of whole experiment to the others, 100 total
       bind_rows(simulation_complete_static, temp_simulation_static)
     rm(temp_simulation_static) #rm temp_dfs
-    simulation_complete_dynamic <-
+    simulation_complete_dynamic <- #same for dynamic model
       bind_rows(simulation_complete_dynamic, temp_simulation_dynamic)
     rm(temp_simulation_dynamic)      
     
   }
-  
+
   simulation_complete_all <- bind_rows( #combine dynamic and static resimulations into 1 df and add id of person and source of model
     simulation_complete_dynamic %>%
       mutate(Berechnung = "BayesFlow"),
@@ -497,11 +523,13 @@ for (person in 1:14) { #unique(df$id)
   ) %>% 
     mutate(person = person)
   
-  simulation_complete_all_14people <- simulation_complete_all_14people %>% #add all resimulations of all people into 1 df
+  simulation_complete_all_14people <- simulation_complete_all_14people %>% #add ALL resimulations of ALL people into 1 df
     bind_rows(simulation_complete_all)
   
   rm(simulation_complete_dynamic)
   rm(simulation_complete_static)
+  
+  person_1_to_14 = person_1_to_14 +1
 }
 
 df_rt <- df %>% #real data
@@ -513,8 +541,8 @@ df_rt <- df %>% #real data
   group_by(condition, difficulty, Berechnung) %>% #for each condition*difficulty*Berechnung of real data we want a median and mad of rt
   summarize(
     median_response_time = median(rt),
-    lower_ci_rt = median_response_time - stats::mad(rt),  #qt(0.975, n() - 1) * sd(rt) / sqrt(n()),
-    upper_ci_rt = median_response_time + stats::mad(rt))         #qt(0.975, n() - 1) * sd(rt) / sqrt(n()
+    lower_ci_rt = median_response_time - stats::mad(rt),  
+    upper_ci_rt = median_response_time + stats::mad(rt))
 
 df_acc <- df %>% #real data
   filter(tutorial == 0) %>% #we don't use the tutorial
@@ -528,7 +556,7 @@ df_acc <- df %>% #real data
   group_by(condition, difficulty, Berechnung) %>% 
   summarize(
     median_accuracy =median(accuracy),
-    lower_ci_acc = median_accuracy - stats::mad(accuracy),  #qt(0.975, n() - 1) * sd(rt) / sqrt(n()),
+    lower_ci_acc = median_accuracy - stats::mad(accuracy),
     upper_ci_acc = median_accuracy + stats::mad(accuracy) 
   )
 
@@ -541,8 +569,8 @@ combined_summary_all_rt <- simulation_complete_all_14people %>% #for each condit
   group_by(condition, difficulty, Berechnung) %>%
   summarize(
     median_response_time = median(response_time_fake),
-    lower_ci_rt = median_response_time - mad(response_time_fake), #qt(0.975, n() - 1) * sd(response_time_fake) / sqrt(n()),
-    upper_ci_rt = median_response_time + mad(response_time_fake)  #qt(0.975, n() - 1) * sd(response_time_fake) / sqrt(n())
+    lower_ci_rt = median_response_time - mad(response_time_fake),
+    upper_ci_rt = median_response_time + mad(response_time_fake)
   )
 
 combined_summary_all_acc <- simulation_complete_all_14people %>% #for each condition*difficulty*Berechnung of simulated data we want a median and mad of rt and mean of rt
@@ -554,7 +582,7 @@ combined_summary_all_acc <- simulation_complete_all_14people %>% #for each condi
   group_by(condition, difficulty, Berechnung) %>% 
   summarize(
     median_accuracy =median(accuracy),
-    lower_ci_acc = median_accuracy - stats::mad(accuracy),  #qt(0.975, n() - 1) * sd(rt) / sqrt(n()),
+    lower_ci_acc = median_accuracy - stats::mad(accuracy),
     upper_ci_acc = median_accuracy + stats::mad(accuracy)
   )
 
@@ -573,14 +601,14 @@ combined_summary_all_complete$Berechnung <- factor(
 #plot for all people, rt
 
 generate_comparison_plot_rt(combined_summary_all_complete)
-ggsave(paste0("C:/Users/steff/Documents/Universität/Master Psychologie/SS 2022/Masterarbeit/Bilder/rt_comparison/rt_comparison_ALL_M1.png"),  width = 6500, height = 4550, units = "px", dpi = 800)
-ggsave(paste0("C:/Users/steff/Documents/Universität/Master Psychologie/SS 2022/Masterarbeit/Bilder/rt_comparison/rt_comparison_ALL_M1.svg"),  width = 6500, height = 4550, units = "px", dpi = 800)
+ggsave(paste0("graphs/rt_comparison/rt_comparison_ALL_M1.png"),  width = 6500, height = 4550, units = "px", dpi = 800)
+ggsave(paste0("graphs/rt_comparison/rt_comparison_ALL_M1.svg"),  width = 6500, height = 4550, units = "px", dpi = 800)
 
 ##plot for all people, acc
 generate_comparison_plot_acc(combined_summary_all_complete, FALSE)
 
-ggsave(paste0("C:/Users/steff/Documents/Universität/Master Psychologie/SS 2022/Masterarbeit/Bilder/acc_comparison/acc_comparison_ALL_M1.png"),  width = 6500, height = 4550, units = "px", dpi = 800)
-ggsave(paste0("C:/Users/steff/Documents/Universität/Master Psychologie/SS 2022/Masterarbeit/Bilder/acc_comparison/acc_comparison_ALL_M1.svg"),  width = 6500, height = 4550, units = "px", dpi = 800)
+ggsave(paste0("graphs/acc_comparison/acc_comparison_ALL_M1.png"),  width = 6500, height = 4550, units = "px", dpi = 800)
+ggsave(paste0("graphs/acc_comparison/acc_comparison_ALL_M1.svg"),  width = 6500, height = 4550, units = "px", dpi = 800)
 
 #individual Plots
 for (person in 1:14) {
@@ -647,13 +675,13 @@ combined_summary_individual_complete$Berechnung <- factor(
   
   #individual plot, rt
 generate_comparison_plot_rt(combined_summary_individual_complete)
-  ggsave(paste0("C:/Users/steff/Documents/Universität/Master Psychologie/SS 2022/Masterarbeit/Bilder/rt_comparison/rt_comparison_subj_", person, "_MAD_M1.png"),  width = 6500, height = 4550, units = "px", dpi = 800)
-  ggsave(paste0("C:/Users/steff/Documents/Universität/Master Psychologie/SS 2022/Masterarbeit/Bilder/rt_comparison/rt_comparison_subj_", person, "_MAD_M1.svg"),  width = 6500, height = 4550, units = "px", dpi = 800)
+  ggsave(paste0("graphs/rt_comparison/rt_comparison_subj_", person, "_MAD_M1.png"),  width = 6500, height = 4550, units = "px", dpi = 800)
+  ggsave(paste0("graphs/rt_comparison/rt_comparison_subj_", person, "_MAD_M1.svg"),  width = 6500, height = 4550, units = "px", dpi = 800)
   
   #individual plot, acc
 generate_comparison_plot_acc(combined_summary_individual_complete, TRUE)
-  ggsave(paste0("C:/Users/steff/Documents/Universität/Master Psychologie/SS 2022/Masterarbeit/Bilder/acc_comparison/acc_comparison_subj_", person, "_M1.png"),  width = 6500, height = 4550, units = "px", dpi = 800)
-  ggsave(paste0("C:/Users/steff/Documents/Universität/Master Psychologie/SS 2022/Masterarbeit/Bilder/acc_comparison/acc_comparison_subj_", person, "_M1.svg"),  width = 6500, height = 4550, units = "px", dpi = 800)
+  ggsave(paste0("graphs/acc_comparison/acc_comparison_subj_", person, "_M1.png"),  width = 6500, height = 4550, units = "px", dpi = 800)
+  ggsave(paste0("graphs/acc_comparison/acc_comparison_subj_", person, "_M1.svg"),  width = 6500, height = 4550, units = "px", dpi = 800)
 }
 
 ```
@@ -662,13 +690,12 @@ generate_comparison_plot_acc(combined_summary_individual_complete, TRUE)
 
 
 ```{r remove outliers for regressions etc, eval = FALSE}
-#for the manipulation check of accuracy we will calculate a bayesian logistic regression of the accuracy with difficulty and condition as predictors. 
+#we will calculate a bayesian logistic regression of the accuracy with difficulty and condition as predictors. 
 
-df2 <- data.frame()
 df2 <- df %>% select(all_of(colnames(df))) %>%
-  filter( correct == 2)
+  filter( correct == 2) #adds df with only colnames, no row has correct == 2
 
-for (i in 1:14) { #unique(df$id)
+for (i in unique(df$id)) {
   df_temp <- df %>% 
     filter(id==i,
            tutorial==0)
@@ -677,7 +704,8 @@ for (i in 1:14) { #unique(df$id)
   df_temp <- df_temp %>% filter(log(df_temp$rt) > border)
   df2 <- df2 %>% add_row(df_temp)
 }
-  
+nrow(df %>% filter(tutorial == 0)) - nrow(df2) #20 cases removed
+
 df2 <- df2 %>%
   mutate(rt_in_ms = rt*1000)
 ```
@@ -693,7 +721,7 @@ bm_acc<- brm(formula = correct ~ difficulty*speed_condition + (1|id),
                      cores=parallel::detectCores(),
                      seed = 12345)
 saveRDS(bm_acc, "bm_acc.rds")
-bm_acc <- readRDS("~/Universität/Master Psychologie/SS 2022/Masterarbeit/bm_acc.rds")
+bm_acc <- readRDS("STAN/bm_acc.rds")
 
 EMM_acc <- emmeans(bm_acc, ~speed_condition*difficulty, at = list(difficulty = c(0,1,2,3)), type = "response")
 EMM_acc_plot <-  emmip(EMM_acc, speed_condition ~ difficulty | speed_condition, plotit = F)
@@ -742,25 +770,12 @@ ggsave("C:/Users/steff/Documents/Universität/Master Psychologie/SS 2022/Mastera
 ```
 
 
-```{r}
-df_all <- read_csv("Universität/Master Psychologie/SS 2022/Masterarbeit/Experiment/Daten/Daten_cleaned/df_all.csv")
-
-kable(df_all %>% 
-  filter(tutorial == 0) %>% 
-  group_by(code, blauetaste, erstebedingung) %>% 
-  slice(1) %>% 
-  ungroup() %>% 
-  arrange(...1) %>% 
-  select(code, blauetaste, erstebedingung)%>% 
-  mutate(code = seq(1, n()),
-         erstebedingung = ifelse(erstebedingung == "speed", "Geschwindigkeitsbedingung", "Genauigkeitsbedingung")
-         ))
-```
+This is a littel extra snippet of code that checks how long each group of difficulties is. Length of difficulty 0 and 3 should mostly be 16 and for 2 and 3 mostly 8.
 
 ```{r}
 
-
-for (person in 1:14) {
+#
+for (person in unique(df$id)) {
   
   df_temp <-  df %>% filter(
     tutorial == 0,
