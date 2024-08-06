@@ -12,7 +12,7 @@ The goal of the thesis was to validate a superstatistical model which describes 
 
 ## The drift diffusion model
 
-![a graph that shows the principle behind a Drift-Diffusion-Model. THe parameters v, a, and z are displayed as well as two accumulation curves.](/graphs/fictional_graphs/DDM_english.png)
+![a graph that shows the principle behind a Drift-Diffusion-Model. THe parameters v, a, and z are displayed as well as two accumulation curves.](graphs/04_fictional_graphs/DDM_english.png)
 
 
 The DDM presupposes a noisy accumulation of evidence for and against the possible answers until one of two thresholds is met and a decision is made.
@@ -33,10 +33,10 @@ This BayesFlow approach was already successfully implemented for the DDM. The go
 
 
 To validate whether the dynamic approach successfully captured these changes of the model parameters we computed static models. An exemplary comparison is seen here. The red lines is the dynamic estimation and the grey line the static estimate. 
-![](graphs/paramter_comparison/parametercomparison_subj_4_M1.png)
+![](graphs/01_paramter_comparison/parametercomparison_subj_4_M1.png)
 
 To further test whether the parameter estimations are plausible, the original datapoints were estimated from the parameters. This graph shows the simulated and original reaction times over all participants. It is apparent that the median estimate of the dynamic model (red dots) closely follows the empirical estimates.
-![](graphs/rt_comparison/rt_comparison_subj_4_MAD_M1.png)
+![](graphs/02_rt_comparison/rt_comparison_subj_4_MAD_M1.png)
 
 ## bibliography 
 Brockmole, J. R. & Logie, R. H. (2013). Age-Related change in visual working memory: a study of 55,753 participants aged 8–75. Frontiers in Psychology, 4. https://doi.org/10.3389/fpsyg.2013.00012
